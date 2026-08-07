@@ -1,4 +1,4 @@
 services:
   gateway:
-    ports:
+    ports: !override
       - "8088:80"

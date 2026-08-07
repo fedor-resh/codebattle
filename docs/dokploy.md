@@ -10,7 +10,7 @@
 - Custom Compose Command: пусто, используется команда Dokploy по умолчанию.
 - Auto Deploy: включить после первого успешного ручного deployment.
 
-Базовый Compose не публикует host ports. Dokploy подключает Traefik к сервису `gateway` на внутреннем порту 80. Файл `docker-compose.local.yml` предназначен только для локальной разработки и в Dokploy не используется. Файл `docker-compose.prod.yml` поднимает собственный Caddy TLS и также не используется в Dokploy, поскольку TLS завершает Traefik.
+Базовый Compose объявляет порт `80` без фиксированного host port: Docker автоматически выбирает гарантированно свободный динамический порт. Dokploy подключает Traefik к сервису `gateway` на внутреннем порту 80. Файл `docker-compose.local.yml` предназначен только для локальной разработки и фиксирует локальный адрес `8088:80`; в Dokploy он не используется. Файл `docker-compose.prod.yml` поднимает собственный Caddy TLS и также не используется в Dokploy, поскольку TLS завершает Traefik.
 
 ## Environment
 
@@ -34,6 +34,8 @@ PUBLIC_ORIGINS=https://battle.example.com
 - HTTPS и Let's Encrypt: включены.
 
 После добавления или изменения домена выполните Redeploy. DNS A/AAAA-запись должна указывать на Dokploy server; TCP-порты 80 и 443 должны быть доступны извне.
+
+Выделенный Docker host port можно увидеть в deployment preview/container details или командой `docker compose port gateway 80`. Он предназначен для прямой диагностики через `http://SERVER_IP:PORT`; в настройке домена по-прежнему указывается **Container Port 80**, а не динамический host port.
 
 ## Persistent data и backup
 

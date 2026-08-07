@@ -83,7 +83,7 @@ services:
     build:
       context: .
       dockerfile: deploy/web.Dockerfile
-    expose:
+    ports:
       - "80"
     depends_on:
       api:
