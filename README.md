@@ -11,6 +11,7 @@
 - 20 версионируемых Go-задач с public/hidden-тестами;
 - Monaco Editor и синхронизация снимков кода с ревизиями;
 - очередь отправок в PostgreSQL и отдельный judge-worker;
+- постоянный прогреваемый Go build cache для быстрых повторных компиляций;
 - изолированные compile/runtime Docker-контейнеры без сети;
 - результаты `accepted`, `wrong_answer`, `compile_error`, `runtime_error` и `time_limit`;
 - счёт серии, победитель раунда, ready-flow и выбор задач без повторов;

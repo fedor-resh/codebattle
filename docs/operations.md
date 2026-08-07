@@ -65,4 +65,6 @@ docker compose exec postgres pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"
 docker system df
 ```
 
+Если linker сообщает `no space left on device`, сначала проверьте `df -h` и `docker system df`. После проверки допустимо удалить только неиспользуемый build cache и dangling images командами `docker builder prune -f` и `docker image prune -f`; PostgreSQL и named volumes удалять нельзя.
+
 Не публикуйте Docker socket или PostgreSQL port наружу. В логах не должно быть паролей, session tokens, исходников hidden tests или полного пользовательского кода.

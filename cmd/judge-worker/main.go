@@ -45,8 +45,10 @@ func main() {
 		Image:           cfg.JudgeImage,
 		SourceDirectory: cfg.SourceDirectory,
 		BinaryDirectory: cfg.BinaryDirectory,
+		CacheDirectory:  cfg.CacheDirectory,
 		SourceVolume:    cfg.SourceVolume,
 		BinaryVolume:    cfg.BinaryVolume,
+		CacheVolume:     cfg.CacheVolume,
 	})
 
 	server := healthServer(cfg.HealthAddress, pool, cfg.DockerBinary)
@@ -68,6 +70,16 @@ func main() {
 }
 
 func work(ctx context.Context, logger *slog.Logger, repository *submissions.Repository, runner *judge.Runner) {
+	if err := runner.CleanStaleArtifacts(); err != nil {
+		logger.Error("clean stale judge artifacts", "error", err)
+	}
+	logger.Info("judge cache warmup started")
+	if err := runner.WarmCache(ctx); err != nil {
+		logger.Error("judge cache warmup failed", "error", err)
+	} else {
+		logger.Info("judge cache warmup completed")
+	}
+
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
 	for {

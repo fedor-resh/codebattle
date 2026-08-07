@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -25,8 +26,10 @@ type Config struct {
 	Image           string
 	SourceDirectory string
 	BinaryDirectory string
+	CacheDirectory  string
 	SourceVolume    string
 	BinaryVolume    string
+	CacheVolume     string
 }
 
 type Result struct {
@@ -41,6 +44,72 @@ type Runner struct {
 
 func NewRunner(config Config) *Runner {
 	return &Runner{config: config}
+}
+
+func (r *Runner) CleanStaleArtifacts() error {
+	for _, directory := range []string{r.config.SourceDirectory, r.config.BinaryDirectory} {
+		cleaned := filepath.Clean(directory)
+		if cleaned == "." || cleaned == string(filepath.Separator) {
+			return fmt.Errorf("refusing to clean unsafe judge directory %q", directory)
+		}
+		entries, err := os.ReadDir(cleaned)
+		if errors.Is(err, os.ErrNotExist) {
+			if err := os.MkdirAll(cleaned, 0o777); err != nil {
+				return err
+			}
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		for _, entry := range entries {
+			if err := os.RemoveAll(filepath.Join(cleaned, entry.Name())); err != nil {
+				return err
+			}
+		}
+		_ = os.Chmod(cleaned, 0o777)
+	}
+	return nil
+}
+
+func (r *Runner) WarmCache(ctx context.Context) error {
+	if r.config.CacheVolume == "" {
+		return nil
+	}
+	job := submissions.Job{
+		Submission: submissions.Submission{ID: "warm-cache"},
+		SourceCode: "package solution\n\nfunc Solve(input string) string { return input }\n",
+		HiddenTestSource: `package solution
+
+import "testing"
+
+func TestWarmCache(t *testing.T) {
+	if Solve("ready") != "ready" {
+		t.Fatal("unexpected result")
+	}
+}
+`,
+		MemoryLimitMB: 256,
+	}
+	if err := r.prepare(job); err != nil {
+		return fmt.Errorf("prepare cache warmup: %w", err)
+	}
+	defer r.cleanup(job.ID)
+
+	warmupCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+	defer cancel()
+	output, err, timedOut := r.dockerCommand(
+		warmupCtx,
+		"codebattle-compile-"+job.ID,
+		r.compileArgs(job),
+	)
+	if timedOut {
+		return errors.New("cache warmup exceeded 60 seconds")
+	}
+	if err != nil {
+		return fmt.Errorf("cache warmup: %s", r.sanitizeOutput(output, job.ID))
+	}
+	return nil
 }
 
 func (r *Runner) Run(
@@ -135,6 +204,12 @@ func (r *Runner) prepare(job submissions.Job) error {
 	if err := os.MkdirAll(binaryDirectory, 0o777); err != nil {
 		return err
 	}
+	if r.config.CacheDirectory != "" {
+		if err := os.MkdirAll(r.config.CacheDirectory, 0o777); err != nil {
+			return err
+		}
+		_ = os.Chmod(r.config.CacheDirectory, 0o777)
+	}
 	_ = os.Chmod(sourceDirectory, 0o777)
 	_ = os.Chmod(binaryDirectory, 0o777)
 	files := map[string]string{
@@ -162,13 +237,14 @@ func (r *Runner) compileArgs(job submissions.Job) []string {
 	memory := strconv.Itoa(max(job.MemoryLimitMB*2, 512)) + "m"
 	return []string{
 		"run", "--rm", "--network", "none", "--read-only",
-		"--memory", memory, "--memory-swap", memory, "--cpus", "1",
+		"--memory", memory, "--memory-swap", memory, "--cpus", "2",
 		"--pids-limit", "64", "--cap-drop", "ALL",
 		"--security-opt", "no-new-privileges", "--user", "65532:65532",
 		"--tmpfs", "/tmp:rw,nosuid,nodev,size=128m",
-		"-e", "GOCACHE=/tmp/go-cache", "-e", "CGO_ENABLED=0",
+		"-e", "GOCACHE=/cache/go-build", "-e", "GOMAXPROCS=2", "-e", "CGO_ENABLED=0",
 		"-v", r.config.SourceVolume + ":/src:ro",
 		"-v", r.config.BinaryVolume + ":/out",
+		"-v", r.config.CacheVolume + ":/cache",
 		"-w", "/src/" + job.ID,
 		r.config.Image,
 		"go", "test", "-c", "-trimpath", "-o", "/out/" + job.ID + "/tests", ".",

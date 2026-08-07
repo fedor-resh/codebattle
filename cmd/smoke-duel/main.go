@@ -114,9 +114,9 @@ func main() {
 	aliceClient.do(http.MethodGet, "/matches/"+game.ID, nil, &matchResponse)
 	bobClient.do(http.MethodGet, "/matches/"+game.ID, nil, &matchResponse)
 
-	if wait := 2*time.Second - time.Since(wrong.CreatedAt); wait > 0 {
-		time.Sleep(wait)
-	}
+	// The API enforces the interval using its own database clock. Waiting a
+	// little over two seconds avoids boundary races with the client clock.
+	time.Sleep(2100 * time.Millisecond)
 
 	judged := submitAndWait(aliceClient, game.ID, string(source))
 	check(judged.Status == "accepted", fmt.Sprintf("judge status %s: %s", judged.Status, judged.Result.Message))

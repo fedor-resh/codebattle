@@ -62,6 +62,8 @@ services:
       JUDGE_IMAGE: golang:1.26.5-alpine
       JUDGE_SOURCE_VOLUME: codebattle-judge-source
       JUDGE_BINARY_VOLUME: codebattle-judge-bin
+      JUDGE_CACHE_VOLUME: codebattle-judge-cache
+      JUDGE_CACHE_DIR: /judge-cache
     depends_on:
       postgres:
         condition: service_healthy
@@ -71,6 +73,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - judge-source:/judge-source
       - judge-bin:/judge-bin
+      - judge-cache:/judge-cache
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8081/health/ready"]
       interval: 10s
@@ -105,3 +108,5 @@ volumes:
     name: codebattle-judge-source
   judge-bin:
     name: codebattle-judge-bin
+  judge-cache:
+    name: codebattle-judge-cache

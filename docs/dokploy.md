@@ -39,7 +39,7 @@ PUBLIC_ORIGINS=https://battle.example.com
 
 ## Persistent data и backup
 
-PostgreSQL использует named volume `postgres-data`. В Dokploy Volume Backups выберите Compose service `postgres`, этот volume и S3 destination. Judge volumes содержат только временные файлы и в backup не включаются.
+PostgreSQL использует named volume `postgres-data`. В Dokploy Volume Backups выберите Compose service `postgres`, этот volume и S3 destination. Judge source/binary volumes содержат только временные файлы, а `judge-cache` — восстанавливаемый Go build cache; их в backup не включают.
 
 `judge-worker` должен сохранить единственный bind mount Docker socket `/var/run/docker.sock`; он нужен для запуска sandbox-контейнеров. Не добавляйте этот mount другим сервисам.
 

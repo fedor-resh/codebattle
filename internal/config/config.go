@@ -24,8 +24,10 @@ type Worker struct {
 	JudgeImage      string
 	SourceDirectory string
 	BinaryDirectory string
+	CacheDirectory  string
 	SourceVolume    string
 	BinaryVolume    string
+	CacheVolume     string
 }
 
 func LoadAPI() (API, error) {
@@ -67,8 +69,10 @@ func LoadWorker() (Worker, error) {
 		JudgeImage:      env("JUDGE_IMAGE", "golang:1.26.5-alpine"),
 		SourceDirectory: env("JUDGE_SOURCE_DIR", "/judge-source"),
 		BinaryDirectory: env("JUDGE_BINARY_DIR", "/judge-bin"),
+		CacheDirectory:  env("JUDGE_CACHE_DIR", "/judge-cache"),
 		SourceVolume:    env("JUDGE_SOURCE_VOLUME", "codebattle-judge-source"),
 		BinaryVolume:    env("JUDGE_BINARY_VOLUME", "codebattle-judge-bin"),
+		CacheVolume:     env("JUDGE_CACHE_VOLUME", "codebattle-judge-cache"),
 	}, nil
 }
 

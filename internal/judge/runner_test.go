@@ -1,6 +1,8 @@
 package judge
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -9,9 +11,11 @@ import (
 
 func TestCompileAndRuntimeContainersAreIsolated(t *testing.T) {
 	runner := NewRunner(Config{
-		Image:        "judge-image",
-		SourceVolume: "source-volume",
-		BinaryVolume: "binary-volume",
+		Image:          "judge-image",
+		SourceVolume:   "source-volume",
+		BinaryVolume:   "binary-volume",
+		CacheVolume:    "cache-volume",
+		CacheDirectory: "/cache",
 	})
 	job := submissions.Job{Submission: submissions.Submission{ID: "safe-job"}, MemoryLimitMB: 256}
 
@@ -24,6 +28,9 @@ func TestCompileAndRuntimeContainersAreIsolated(t *testing.T) {
 		"no-new-privileges",
 		"source-volume:/src:ro",
 		"binary-volume:/out",
+		"cache-volume:/cache",
+		"GOCACHE=/cache/go-build",
+		"--cpus 2",
 	} {
 		if !strings.Contains(compile, required) {
 			t.Fatalf("compile args do not contain %q: %s", required, compile)
@@ -36,6 +43,42 @@ func TestCompileAndRuntimeContainersAreIsolated(t *testing.T) {
 	}
 	if !strings.Contains(runtime, "binary-volume:/out:ro") {
 		t.Fatalf("runtime binary volume is not read-only: %s", runtime)
+	}
+}
+
+func TestCleanStaleArtifactsPreservesCache(t *testing.T) {
+	root := t.TempDir()
+	sourceDirectory := filepath.Join(root, "source")
+	binaryDirectory := filepath.Join(root, "binary")
+	cacheDirectory := filepath.Join(root, "cache")
+	for _, directory := range []string{sourceDirectory, binaryDirectory, cacheDirectory} {
+		if err := os.MkdirAll(directory, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(directory, "artifact"), []byte("data"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	runner := NewRunner(Config{
+		SourceDirectory: sourceDirectory,
+		BinaryDirectory: binaryDirectory,
+		CacheDirectory:  cacheDirectory,
+	})
+
+	if err := runner.CleanStaleArtifacts(); err != nil {
+		t.Fatal(err)
+	}
+	for _, directory := range []string{sourceDirectory, binaryDirectory} {
+		entries, err := os.ReadDir(directory)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(entries) != 0 {
+			t.Fatalf("directory %s was not cleaned", directory)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(cacheDirectory, "artifact")); err != nil {
+		t.Fatalf("cache artifact was removed: %v", err)
 	}
 }
 
