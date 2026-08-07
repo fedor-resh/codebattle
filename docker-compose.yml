@@ -1,8 +1,7 @@
-name: codebattle
-
 services:
   postgres:
     image: postgres:17-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-codebattle}
       POSTGRES_USER: ${POSTGRES_USER:-codebattle}
@@ -17,6 +16,7 @@ services:
     networks: [app]
 
   api:
+    restart: unless-stopped
     build:
       context: .
       dockerfile: deploy/api.Dockerfile
@@ -51,6 +51,7 @@ services:
     networks: [app]
 
   judge-worker:
+    restart: unless-stopped
     build:
       context: .
       dockerfile: deploy/judge-worker.Dockerfile
@@ -78,11 +79,12 @@ services:
     networks: [app]
 
   gateway:
+    restart: unless-stopped
     build:
       context: .
       dockerfile: deploy/web.Dockerfile
-    ports:
-      - "8088:80"
+    expose:
+      - "80"
     depends_on:
       api:
         condition: service_healthy

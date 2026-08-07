@@ -40,4 +40,6 @@ jobs:
           npm run build
 
       - name: Validate Compose
-        run: docker compose config --quiet
+        run: |
+          docker compose config --quiet
+          docker compose -f docker-compose.yml -f docker-compose.local.yml config --quiet

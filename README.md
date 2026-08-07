@@ -25,22 +25,22 @@
 Требуется Docker Desktop с Linux containers.
 
 ```bash
-docker compose up -d --build
+docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
 ```
 
 После запуска приложение доступно на [http://localhost:8088](http://localhost:8088). Состояние контейнеров:
 
 ```bash
-docker compose ps
+docker compose -f docker-compose.yml -f docker-compose.local.yml ps
 ```
 
 Остановка:
 
 ```bash
-docker compose down
+docker compose -f docker-compose.yml -f docker-compose.local.yml down
 ```
 
-PostgreSQL-данные сохраняются в named volume. Чтобы удалить их вместе со стеком, используйте `docker compose down -v` только осознанно.
+PostgreSQL-данные сохраняются в named volume. Чтобы удалить их вместе со стеком, добавьте `-v` к команде `down` только осознанно.
 
 ## Полный smoke-сценарий
 
@@ -77,6 +77,7 @@ npm run typecheck
 npm test
 npm run build
 docker compose config --quiet
+docker compose -f docker-compose.yml -f docker-compose.local.yml config --quiet
 ```
 
 Те же проверки запускаются workflow `.github/workflows/ci.yml`.
@@ -93,3 +94,4 @@ docker compose config --quiet
 - [Этапы и фактический статус реализации](docs/implementation-roadmap.md)
 - [Правила миграций](db/migrations/README.md)
 - [Production-развёртывание, backup и обновление](docs/operations.md)
+- [Развёртывание через Dokploy](docs/dokploy.md)
