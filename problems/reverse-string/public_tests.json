@@ -1,0 +1,10 @@
+[
+  {
+    "input": "hello",
+    "expected": "olleh"
+  },
+  {
+    "input": "Привет",
+    "expected": "тевирП"
+  }
+]

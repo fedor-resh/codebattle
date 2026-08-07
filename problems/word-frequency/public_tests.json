@@ -1,0 +1,10 @@
+[
+  {
+    "input": "go code go",
+    "expected": "code:1,go:2"
+  },
+  {
+    "input": "b a b",
+    "expected": "a:1,b:2"
+  }
+]

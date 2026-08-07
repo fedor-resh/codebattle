@@ -1,0 +1,16 @@
+.env
+.env.local
+node_modules/
+apps/web/dist/
+apps/web/coverage/
+bin/
+tmp/
+*.log
+*.test
+*.tsbuildinfo
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+.playwright-cli/
+output/playwright/

@@ -1,0 +1,10 @@
+[
+  {
+    "input": "3|abc XYZ",
+    "expected": "def ABC"
+  },
+  {
+    "input": "1|z",
+    "expected": "a"
+  }
+]

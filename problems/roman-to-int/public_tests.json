@@ -1,0 +1,10 @@
+[
+  {
+    "input": "III",
+    "expected": "3"
+  },
+  {
+    "input": "MCMXCIV",
+    "expected": "1994"
+  }
+]

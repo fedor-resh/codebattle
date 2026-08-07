@@ -1,0 +1,10 @@
+[
+  {
+    "input": "go code battle",
+    "expected": "battle"
+  },
+  {
+    "input": "one two",
+    "expected": "one"
+  }
+]

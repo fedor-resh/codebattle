@@ -1,0 +1,10 @@
+[
+  {
+    "input": "listen|silent",
+    "expected": "true"
+  },
+  {
+    "input": "go|goo",
+    "expected": "false"
+  }
+]
