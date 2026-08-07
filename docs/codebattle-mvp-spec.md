@@ -1268,7 +1268,8 @@ binary копируется в отдельный runtime sandbox; исходн�
 Runtime sandbox:
 
 - Go toolchain line `1.26`, закрепленная точным image digest; `GOOS=linux`,
-  `GOARCH=amd64`, `CGO_ENABLED=0`;
+  `GOARCH` соответствует архитектуре deployment host (`amd64` или `arm64`),
+  `CGO_ENABLED=0`;
 - `--network none`;
 - non-root UID/GID;
 - read-only root filesystem;

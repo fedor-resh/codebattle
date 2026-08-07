@@ -1,5 +1,7 @@
 # syntax=docker/dockerfile:1
 FROM golang:1.26.5-alpine AS build
+ARG TARGETOS
+ARG TARGETARCH
 
 WORKDIR /src
 COPY go.mod go.sum ./
@@ -7,7 +9,7 @@ RUN go mod download
 COPY cmd ./cmd
 COPY internal ./internal
 COPY db ./db
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/problem-seed ./cmd/problem-seed
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -trimpath -ldflags="-s -w" -o /out/problem-seed ./cmd/problem-seed
 
 FROM golang:1.26.5-alpine
 WORKDIR /app
