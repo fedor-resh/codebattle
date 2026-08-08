@@ -1,10 +1,10 @@
 [
   {
-    "input": "2|1,2,3,4,5",
-    "expected": "4,5,1,2,3"
+    "arguments": [[1, 2, 3, 4, 5], 2],
+    "expected": [4, 5, 1, 2, 3]
   },
   {
-    "input": "1|7,8",
-    "expected": "8,7"
+    "arguments": [[7, 8], 1],
+    "expected": [8, 7]
   }
 ]

@@ -1,7 +1,7 @@
 package solution
 
 // Solve решает задачу «Анаграммы».
-func Solve(input string) string {
+func Solve(first, second string) bool {
 	// Напишите решение
-	return ""
+	return false
 }

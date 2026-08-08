@@ -2,7 +2,7 @@ slug: count-vowels
 title: "Подсчёт гласных"
 difficulty: easy
 function: Solve
-signature: "func Solve(input string) string"
-version: 1
+signature: "func Solve(text string) int"
+version: 2
 time_limit_ms: 2000
 memory_limit_mb: 256

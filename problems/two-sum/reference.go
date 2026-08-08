@@ -1,20 +1,12 @@
 package solution
 
-import (
-	"strconv"
-	"strings"
-)
-
-func Solve(input string) string {
-	parts := strings.SplitN(input, "|", 2)
-	target, _ := strconv.Atoi(parts[0])
+func Solve(nums []int, target int) []int {
 	seen := map[int]int{}
-	for index, raw := range strings.Split(parts[1], ",") {
-		value, _ := strconv.Atoi(raw)
+	for index, value := range nums {
 		if other, ok := seen[target-value]; ok {
-			return strconv.Itoa(other) + "," + strconv.Itoa(index)
+			return []int{other, index}
 		}
 		seen[value] = index
 	}
-	return ""
+	return nil
 }

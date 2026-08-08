@@ -1,10 +1,10 @@
 [
   {
-    "input": "go code battle",
+    "arguments": ["go code battle"],
     "expected": "battle"
   },
   {
-    "input": "one two",
+    "arguments": ["one two"],
     "expected": "one"
   }
 ]

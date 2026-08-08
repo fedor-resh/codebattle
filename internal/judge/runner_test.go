@@ -1,6 +1,7 @@
 package judge
 
 import (
+	"encoding/json"
 	"go/format"
 	"os"
 	"os/exec"
@@ -166,9 +167,12 @@ func TestInfrastructureFailureMessage(t *testing.T) {
 }
 
 func TestPublicTestSourceIsValidGoAndQuotesValues(t *testing.T) {
-	source := publicTestSource([]problems.PublicTest{
-		{Input: "line one\n\"quoted\"", Expected: "ответ"},
-	})
+	source, err := publicTestSource([]problems.PublicTest{
+		testPublicCase([]string{`"line one\n\"quoted\""`}, `"ответ"`),
+	}, "func Solve(text string) string")
+	if err != nil {
+		t.Fatal(err)
+	}
 	if _, err := format.Source([]byte(source)); err != nil {
 		t.Fatalf("generated public test is not valid Go: %v\n%s", err, source)
 	}
@@ -179,6 +183,14 @@ func TestPublicTestSourceIsValidGoAndQuotesValues(t *testing.T) {
 
 func TestGeneratedPublicTestCapturesActualConsoleAndPanic(t *testing.T) {
 	directory := t.TempDir()
+	publicTests := []problems.PublicTest{
+		testPublicCase([]string{`"hello"`}, `"HELLO"`),
+		testPublicCase([]string{`"panic"`}, `"PANIC"`),
+	}
+	publicSource, err := publicTestSource(publicTests, "func Solve(input string) string")
+	if err != nil {
+		t.Fatal(err)
+	}
 	files := map[string]string{
 		"go.mod": "module solution\n\ngo 1.26.0\n",
 		"solution.go": `package solution
@@ -196,10 +208,7 @@ func Solve(input string) string {
 	return strings.ToUpper(input)
 }
 `,
-		"public_test.go": publicTestSource([]problems.PublicTest{
-			{Input: "hello", Expected: "HELLO"},
-			{Input: "panic", Expected: "PANIC"},
-		}),
+		"public_test.go": publicSource,
 	}
 	for name, content := range files {
 		if err := os.WriteFile(filepath.Join(directory, name), []byte(content), 0o644); err != nil {
@@ -213,12 +222,14 @@ func Solve(input string) string {
 	if err == nil {
 		t.Fatal("generated tests unexpectedly passed despite the panic case")
 	}
-	report := collectPublicTestReport(string(output), []problems.PublicTest{
-		{Input: "hello", Expected: "HELLO"},
-		{Input: "panic", Expected: "PANIC"},
-	}, false)
+	report := collectPublicTestReport(
+		string(output),
+		publicTests,
+		"func Solve(input string) string",
+		false,
+	)
 
-	if report.TestCases[0].Actual != "HELLO" || !report.TestCases[0].ActualAvailable {
+	if report.TestCases[0].Actual != `"HELLO"` || !report.TestCases[0].ActualAvailable {
 		t.Fatalf("successful public result = %+v", report.TestCases[0])
 	}
 	if report.TestCases[1].ActualAvailable || report.TestCases[1].Error != "panic: boom" {
@@ -232,8 +243,8 @@ func Solve(input string) string {
 
 func TestCollectPublicTestReportIncludesValuesAndConsole(t *testing.T) {
 	publicTests := []problems.PublicTest{
-		{Input: "level", Expected: "true"},
-		{Input: "Code", Expected: "false"},
+		testPublicCase([]string{`"level"`}, `true`),
+		testPublicCase([]string{`"Code"`}, `false`),
 	}
 	output := strings.Join([]string{
 		`__CODEBATTLE_PUBLIC_RESULT__{"Index":1,"Actual":"true","ActualAvailable":true,"Passed":true,"Console":"checking level\n"}`,
@@ -241,7 +252,7 @@ func TestCollectPublicTestReportIncludesValuesAndConsole(t *testing.T) {
 		"--- PASS: TestHidden (0.00s)",
 	}, "\n")
 
-	report := collectPublicTestReport(output, publicTests, false)
+	report := collectPublicTestReport(output, publicTests, "func Solve(text string) bool", false)
 	results := report.TestCases
 	if len(results) != 2 {
 		t.Fatalf("got %d results, want 2", len(results))
@@ -262,8 +273,8 @@ func TestCollectPublicTestReportIncludesValuesAndConsole(t *testing.T) {
 
 func TestCollectPublicTestReportUsesSuccessfulExitWhenMarkerIsMissing(t *testing.T) {
 	report := collectPublicTestReport("", []problems.PublicTest{
-		{Input: "hello", Expected: "world"},
-	}, true)
+		testPublicCase([]string{`"hello"`}, `"world"`),
+	}, "func Solve(text string) string", true)
 	results := report.TestCases
 
 	if results[0].Status != "passed" || results[0].ActualAvailable {
@@ -274,7 +285,8 @@ func TestCollectPublicTestReportUsesSuccessfulExitWhenMarkerIsMissing(t *testing
 func TestCollectTestReportIncludesPanicAndCapturedConsole(t *testing.T) {
 	report := collectPublicTestReport(
 		`__CODEBATTLE_PUBLIC_RESULT__{"Index":1,"Actual":"","ActualAvailable":false,"Passed":false,"Console":"before panic\n","RuntimeError":"panic: index out of range"}`,
-		[]problems.PublicTest{{Input: "input", Expected: "output"}},
+		[]problems.PublicTest{testPublicCase([]string{`"input"`}, `"output"`)},
+		"func Solve(text string) string",
 		false,
 	)
 
@@ -286,6 +298,17 @@ func TestCollectTestReportIncludesPanicAndCapturedConsole(t *testing.T) {
 	}
 	if report.TestCases[0].ActualAvailable || report.TestCases[0].Error != "panic: index out of range" {
 		t.Fatalf("public result = %+v", report.TestCases[0])
+	}
+}
+
+func testPublicCase(arguments []string, expected string) problems.PublicTest {
+	rawArguments := make([]json.RawMessage, len(arguments))
+	for index, argument := range arguments {
+		rawArguments[index] = json.RawMessage(argument)
+	}
+	return problems.PublicTest{
+		Arguments: rawArguments,
+		Expected:  json.RawMessage(expected),
 	}
 }
 

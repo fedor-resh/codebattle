@@ -1,7 +1,7 @@
 package solution
 
 // Solve решает задачу «Уникальные слова».
-func Solve(input string) string {
+func Solve(words []string) []string {
 	// Напишите решение
-	return ""
+	return nil
 }

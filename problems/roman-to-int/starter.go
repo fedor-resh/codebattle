@@ -1,7 +1,7 @@
 package solution
 
 // Solve решает задачу «Римское число».
-func Solve(input string) string {
+func Solve(roman string) int {
 	// Напишите решение
-	return ""
+	return 0
 }

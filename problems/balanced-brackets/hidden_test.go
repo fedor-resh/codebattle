@@ -5,11 +5,11 @@ import "testing"
 func TestHidden(t *testing.T) {
 	cases := []struct {
 		input string
-		want  string
+		want  bool
 	}{
-		{"", "true"},
-		{"(", "false"},
-		{"{[()()]}", "true"},
+		{"", true},
+		{"(", false},
+		{"{[()()]}", true},
 	}
 	for index, testCase := range cases {
 		if got := Solve(testCase.input); got != testCase.want {

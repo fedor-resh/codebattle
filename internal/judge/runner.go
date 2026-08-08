@@ -3,6 +3,7 @@ package judge
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -95,11 +96,13 @@ func (r *Runner) WarmCache(ctx context.Context) error {
 		return nil
 	}
 	job := submissions.Job{
-		Submission: submissions.Submission{ID: "warm-cache"},
-		SourceCode: "package solution\n\nfunc Solve(input string) string { return input }\n",
-		PublicTests: []problems.PublicTest{
-			{Input: "ready", Expected: "ready"},
-		},
+		Submission:        submissions.Submission{ID: "warm-cache"},
+		FunctionSignature: "func Solve(input string) string",
+		SourceCode:        "package solution\n\nfunc Solve(input string) string { return input }\n",
+		PublicTests: []problems.PublicTest{{
+			Arguments: []json.RawMessage{json.RawMessage(`"ready"`)},
+			Expected:  json.RawMessage(`"ready"`),
+		}},
 		HiddenTestSource: `package solution
 
 import "testing"
@@ -145,7 +148,7 @@ func (r *Runner) Run(
 	if !jobIDPattern.MatchString(job.ID) {
 		return result
 	}
-	if err := problems.ValidateSolution(job.SourceCode, "Solve"); err != nil {
+	if err := problems.ValidateSolution(job.SourceCode, job.FunctionSignature); err != nil {
 		result.Status = "compile_error"
 		result.Message = err.Error()
 		return result
@@ -190,7 +193,7 @@ func (r *Runner) Run(
 		job,
 		"^TestCodebattlePublic$",
 	)
-	publicReport := collectPublicTestReport(publicOutput, job.PublicTests, publicErr == nil)
+	publicReport := collectPublicTestReport(publicOutput, job.PublicTests, job.FunctionSignature, publicErr == nil)
 	result.TestCases = publicReport.TestCases
 	result.ConsoleOutput = publicReport.ConsoleOutput
 	result.ConsoleOutputTruncated = publicReport.ConsoleOutputTruncated
@@ -294,7 +297,11 @@ func (r *Runner) prepare(job submissions.Job) error {
 		"hidden_test.go": job.HiddenTestSource,
 	}
 	if len(job.PublicTests) > 0 {
-		files["public_test.go"] = publicTestSource(job.PublicTests)
+		publicSource, err := publicTestSource(job.PublicTests, job.FunctionSignature)
+		if err != nil {
+			return err
+		}
+		files["public_test.go"] = publicSource
 	}
 	for name, content := range files {
 		if err := os.WriteFile(filepath.Join(sourceDirectory, name), []byte(content), 0o644); err != nil {

@@ -1,18 +1,21 @@
 package solution
 
-import "testing"
+import (
+	"reflect"
+	"testing"
+)
 
 func TestHidden(t *testing.T) {
 	cases := []struct {
-		input string
-		want  string
+		words []string
+		want  []string
 	}{
-		{"", ""},
-		{"one", "one"},
-		{"A a A", "A,a"},
+		{[]string{}, []string{}},
+		{[]string{"one"}, []string{"one"}},
+		{[]string{"A", "a", "A"}, []string{"A", "a"}},
 	}
 	for index, testCase := range cases {
-		if got := Solve(testCase.input); got != testCase.want {
+		if got := Solve(testCase.words); !reflect.DeepEqual(got, testCase.want) {
 			t.Fatalf("case %d failed", index+1)
 		}
 	}

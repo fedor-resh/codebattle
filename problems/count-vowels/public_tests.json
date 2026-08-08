@@ -1,10 +1,10 @@
 [
   {
-    "input": "CodeBattle",
-    "expected": "4"
+    "arguments": ["CodeBattle"],
+    "expected": 4
   },
   {
-    "input": "rhythm",
-    "expected": "0"
+    "arguments": ["rhythm"],
+    "expected": 0
   }
 ]

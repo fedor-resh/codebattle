@@ -2,7 +2,7 @@ slug: anagram
 title: "Анаграммы"
 difficulty: easy
 function: Solve
-signature: "func Solve(input string) string"
-version: 1
+signature: "func Solve(first, second string) bool"
+version: 2
 time_limit_ms: 2000
 memory_limit_mb: 256

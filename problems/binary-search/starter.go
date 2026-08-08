@@ -1,7 +1,7 @@
 package solution
 
 // Solve решает задачу «Бинарный поиск».
-func Solve(input string) string {
+func Solve(nums []int, target int) int {
 	// Напишите решение
-	return ""
+	return -1
 }

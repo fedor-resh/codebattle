@@ -1,7 +1,7 @@
 package solution
 
 // Solve решает задачу «Подсчёт гласных».
-func Solve(input string) string {
+func Solve(text string) int {
 	// Напишите решение
-	return ""
+	return 0
 }

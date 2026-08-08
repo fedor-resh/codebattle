@@ -1,23 +1,17 @@
 package solution
 
-import "strings"
-
-func Solve(input string) string {
-	parts := strings.SplitN(input, "|", 2)
-	if len(parts) != 2 {
-		return "false"
-	}
+func Solve(first, second string) bool {
 	counts := map[rune]int{}
-	for _, char := range parts[0] {
+	for _, char := range first {
 		counts[char]++
 	}
-	for _, char := range parts[1] {
+	for _, char := range second {
 		counts[char]--
 	}
 	for _, count := range counts {
 		if count != 0 {
-			return "false"
+			return false
 		}
 	}
-	return "true"
+	return true
 }

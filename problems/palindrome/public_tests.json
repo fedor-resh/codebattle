@@ -1,10 +1,10 @@
 [
   {
-    "input": "level",
-    "expected": "true"
+    "arguments": ["level"],
+    "expected": true
   },
   {
-    "input": "Code",
-    "expected": "false"
+    "arguments": ["Code"],
+    "expected": false
   }
 ]

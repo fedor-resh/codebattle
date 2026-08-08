@@ -8,9 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"go/ast"
-	"go/parser"
-	"go/token"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -44,8 +41,32 @@ type Metadata struct {
 }
 
 type PublicTest struct {
-	Input    string `json:"input"`
-	Expected string `json:"expected"`
+	Arguments []json.RawMessage `json:"arguments"`
+	Expected  json.RawMessage   `json:"expected"`
+}
+
+func (test *PublicTest) UnmarshalJSON(data []byte) error {
+	var value struct {
+		Arguments []json.RawMessage `json:"arguments"`
+		Input     *string           `json:"input"`
+		Expected  json.RawMessage   `json:"expected"`
+	}
+	if err := json.Unmarshal(data, &value); err != nil {
+		return err
+	}
+	if value.Arguments == nil && value.Input != nil {
+		encoded, _ := json.Marshal(*value.Input)
+		value.Arguments = []json.RawMessage{encoded}
+	}
+	if value.Arguments == nil {
+		return errors.New("arguments are required")
+	}
+	if len(value.Expected) == 0 {
+		return errors.New("expected is required")
+	}
+	test.Arguments = value.Arguments
+	test.Expected = value.Expected
+	return nil
 }
 
 type Problem struct {
@@ -129,11 +150,15 @@ func loadProblem(directory, directoryName string) (Problem, error) {
 	if strings.TrimSpace(string(content["statement.md"])) == "" {
 		return Problem{}, fmt.Errorf("problem %s: statement is empty", metadata.Slug)
 	}
-	if err := ValidateSolution(string(content["starter.go"]), metadata.Function); err != nil {
+	if err := ValidateSolution(string(content["starter.go"]), metadata.Signature); err != nil {
 		return Problem{}, fmt.Errorf("problem %s starter: %w", metadata.Slug, err)
 	}
-	if err := ValidateSolution(string(content["reference.go"]), metadata.Function); err != nil {
+	if err := ValidateSolution(string(content["reference.go"]), metadata.Signature); err != nil {
 		return Problem{}, fmt.Errorf("problem %s reference: %w", metadata.Slug, err)
+	}
+	schema, _ := ParseSignature(metadata.Signature)
+	if err := ValidatePublicTests(schema, publicTests); err != nil {
+		return Problem{}, fmt.Errorf("problem %s: %w", metadata.Slug, err)
 	}
 
 	contentHash := hex.EncodeToString(hasher.Sum(nil))
@@ -161,39 +186,16 @@ func validateMetadata(metadata Metadata, directoryName string) error {
 	if metadata.Difficulty != "easy" && metadata.Difficulty != "medium" && metadata.Difficulty != "hard" {
 		return fmt.Errorf("problem %s: invalid difficulty", metadata.Slug)
 	}
-	if metadata.Function != "Solve" || metadata.Signature != "func Solve(input string) string" {
-		return fmt.Errorf("problem %s: MVP supports only func Solve(input string) string", metadata.Slug)
+	if metadata.Function != "Solve" {
+		return fmt.Errorf("problem %s: function must be Solve", metadata.Slug)
+	}
+	if _, err := ParseSignature(metadata.Signature); err != nil {
+		return fmt.Errorf("problem %s: %w", metadata.Slug, err)
 	}
 	if metadata.Version <= 0 || metadata.TimeLimitMS <= 0 || metadata.MemoryLimitMB <= 0 {
 		return fmt.Errorf("problem %s: version and limits must be positive", metadata.Slug)
 	}
 	return nil
-}
-
-func ValidateSolution(source, functionName string) error {
-	file, err := parser.ParseFile(token.NewFileSet(), "solution.go", source, parser.AllErrors)
-	if err != nil {
-		return fmt.Errorf("parse Go source: %w", err)
-	}
-	if file.Name.Name != "solution" {
-		return errors.New("package must be solution")
-	}
-	for _, declaration := range file.Decls {
-		function, ok := declaration.(*ast.FuncDecl)
-		if !ok || function.Recv != nil || function.Name.Name != functionName {
-			continue
-		}
-		if len(function.Type.Params.List) != 1 || len(function.Type.Results.List) != 1 {
-			return errors.New("Solve must accept one argument and return one value")
-		}
-		parameter, parameterOK := function.Type.Params.List[0].Type.(*ast.Ident)
-		result, resultOK := function.Type.Results.List[0].Type.(*ast.Ident)
-		if !parameterOK || !resultOK || parameter.Name != "string" || result.Name != "string" {
-			return errors.New("Solve signature must be func Solve(input string) string")
-		}
-		return nil
-	}
-	return fmt.Errorf("required function %s was not found", functionName)
 }
 
 func validateReference(ctx context.Context, problem Problem) error {
@@ -203,9 +205,18 @@ func validateReference(ctx context.Context, problem Problem) error {
 	}
 	defer os.RemoveAll(directory)
 
+	schema, err := ParseSignature(problem.Signature)
+	if err != nil {
+		return err
+	}
+	publicTest, err := publicValidationTestSource(schema, problem.PublicTests)
+	if err != nil {
+		return err
+	}
 	files := map[string]string{
 		"go.mod":         "module solution\n\ngo 1.26.0\n",
 		"solution.go":    problem.Reference,
+		"public_test.go": publicTest,
 		"hidden_test.go": problem.HiddenTest,
 	}
 	for name, content := range files {

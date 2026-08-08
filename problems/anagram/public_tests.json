@@ -1,10 +1,10 @@
 [
   {
-    "input": "listen|silent",
-    "expected": "true"
+    "arguments": ["listen", "silent"],
+    "expected": true
   },
   {
-    "input": "go|goo",
-    "expected": "false"
+    "arguments": ["go", "goo"],
+    "expected": false
   }
 ]

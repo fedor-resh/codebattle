@@ -1,7 +1,7 @@
 package solution
 
 // Solve решает задачу «Число Фибоначчи».
-func Solve(input string) string {
+func Solve(n int) uint64 {
 	// Напишите решение
-	return ""
+	return 0
 }

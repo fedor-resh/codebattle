@@ -34,12 +34,13 @@ type Submission struct {
 
 type Job struct {
 	Submission
-	ProblemVersionID string
-	SourceCode       string
-	PublicTests      []problems.PublicTest
-	HiddenTestSource string
-	TimeLimitMS      int
-	MemoryLimitMB    int
+	ProblemVersionID  string
+	FunctionSignature string
+	SourceCode        string
+	PublicTests       []problems.PublicTest
+	HiddenTestSource  string
+	TimeLimitMS       int
+	MemoryLimitMB     int
 }
 
 type Repository struct {
@@ -54,26 +55,27 @@ func (r *Repository) Create(ctx context.Context, userID, matchID, source string)
 	if len([]byte(source)) > 64*1024 {
 		return Submission{}, ErrSourceTooLarge
 	}
-	if err := problems.ValidateSolution(source, "Solve"); err != nil {
-		return Submission{}, fmt.Errorf("%w: %v", ErrInvalidSource, err)
-	}
-
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return Submission{}, err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	var problemVersionID string
+	var problemVersionID, functionSignature string
 	if err := tx.QueryRow(ctx, `
-		SELECT problem_version_id FROM matches
-		WHERE id = $1 AND state IN ('active', 'waiting_ready')
+		SELECT match.problem_version_id, problem.function_signature
+		FROM matches match
+		JOIN problem_versions problem ON problem.id = match.problem_version_id
+		WHERE match.id = $1 AND match.state IN ('active', 'waiting_ready')
 			AND (player_one_id = $2 OR player_two_id = $2)
-		FOR UPDATE
-	`, matchID, userID).Scan(&problemVersionID); errors.Is(err, pgx.ErrNoRows) {
+		FOR UPDATE OF match
+	`, matchID, userID).Scan(&problemVersionID, &functionSignature); errors.Is(err, pgx.ErrNoRows) {
 		return Submission{}, ErrMatchNotFound
 	} else if err != nil {
 		return Submission{}, err
+	}
+	if err := problems.ValidateSolution(source, functionSignature); err != nil {
+		return Submission{}, fmt.Errorf("%w: %v", ErrInvalidSource, err)
 	}
 
 	var pending int
@@ -155,7 +157,7 @@ func (r *Repository) Claim(ctx context.Context) (Job, error) {
 	var publicTests string
 	err = tx.QueryRow(ctx, `
 		SELECT s.id, s.match_id, s.user_id, s.status, s.created_at,
-			s.problem_version_id, s.source_code, problem.public_tests::text,
+			s.problem_version_id, problem.function_signature, s.source_code, problem.public_tests::text,
 			bundle.hidden_test_source,
 			problem.time_limit_ms, problem.memory_limit_mb
 		FROM submissions s
@@ -167,7 +169,7 @@ func (r *Repository) Claim(ctx context.Context) (Job, error) {
 		LIMIT 1
 	`).Scan(
 		&job.ID, &job.MatchID, &job.UserID, &job.Status, &job.CreatedAt,
-		&job.ProblemVersionID, &job.SourceCode, &publicTests, &job.HiddenTestSource,
+		&job.ProblemVersionID, &job.FunctionSignature, &job.SourceCode, &publicTests, &job.HiddenTestSource,
 		&job.TimeLimitMS, &job.MemoryLimitMB,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {

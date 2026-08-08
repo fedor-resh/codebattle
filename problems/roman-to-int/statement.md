@@ -2,4 +2,4 @@
 
 Преобразуйте корректное римское число от I до MMMCMXCIX в десятичное.
 
-Реализуйте функцию `Solve(input string) string` в пакете `solution`.
+Реализуйте функцию `Solve(roman string) int` в пакете `solution`.

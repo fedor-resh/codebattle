@@ -1,10 +1,10 @@
 [
   {
-    "input": "10",
-    "expected": "55"
+    "arguments": [10],
+    "expected": 55
   },
   {
-    "input": "0",
-    "expected": "0"
+    "arguments": [0],
+    "expected": 0
   }
 ]

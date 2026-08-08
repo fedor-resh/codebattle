@@ -31,8 +31,21 @@ func TestCatalogContainsTwentyValidProblems(t *testing.T) {
 }
 
 func TestValidateSolutionRejectsWrongSignature(t *testing.T) {
-	err := ValidateSolution("package solution\nfunc Solve(input int) string { return \"\" }", "Solve")
+	err := ValidateSolution(
+		"package solution\nfunc Solve(input int) string { return \"\" }",
+		"func Solve(input string) string",
+	)
 	if err == nil {
 		t.Fatal("wrong signature was accepted")
+	}
+}
+
+func TestValidateSolutionAcceptsPreparedArguments(t *testing.T) {
+	err := ValidateSolution(
+		"package solution\nfunc Solve(values []int, target int) []int { return nil }",
+		"func Solve(nums []int, target int) []int",
+	)
+	if err != nil {
+		t.Fatal(err)
 	}
 }

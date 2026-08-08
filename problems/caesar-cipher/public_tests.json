@@ -1,10 +1,10 @@
 [
   {
-    "input": "3|abc XYZ",
+    "arguments": ["abc XYZ", 3],
     "expected": "def ABC"
   },
   {
-    "input": "1|z",
+    "arguments": ["z", 1],
     "expected": "a"
   }
 ]

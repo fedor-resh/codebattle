@@ -1,7 +1,7 @@
 package solution
 
 // Solve решает задачу «Наибольший общий делитель».
-func Solve(input string) string {
+func Solve(a, b int) int {
 	// Напишите решение
-	return ""
+	return 0
 }

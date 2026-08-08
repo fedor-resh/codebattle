@@ -4,15 +4,16 @@ import "testing"
 
 func TestHidden(t *testing.T) {
 	cases := []struct {
-		input string
-		want  string
+		a    int
+		b    int
+		want int
 	}{
-		{"0,5", "5"},
-		{"270,192", "6"},
-		{"13,13", "13"},
+		{0, 5, 5},
+		{270, 192, 6},
+		{13, 13, 13},
 	}
 	for index, testCase := range cases {
-		if got := Solve(testCase.input); got != testCase.want {
+		if got := Solve(testCase.a, testCase.b); got != testCase.want {
 			t.Fatalf("case %d failed", index+1)
 		}
 	}

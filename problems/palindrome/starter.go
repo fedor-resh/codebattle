@@ -1,7 +1,7 @@
 package solution
 
 // Solve решает задачу «Палиндром».
-func Solve(input string) string {
+func Solve(text string) bool {
 	// Напишите решение
-	return ""
+	return false
 }

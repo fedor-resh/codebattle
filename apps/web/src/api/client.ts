@@ -53,7 +53,7 @@ export type Problem = {
   statement_markdown: string;
   function_signature: string;
   starter_code: string;
-  public_tests: Array<{ input: string; expected: string }>;
+  public_tests: Array<{ arguments?: unknown[]; input?: string; expected: unknown }>;
   time_limit_ms: number;
   memory_limit_mb: number;
 };

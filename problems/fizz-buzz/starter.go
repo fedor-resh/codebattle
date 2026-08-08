@@ -1,7 +1,7 @@
 package solution
 
 // Solve решает задачу «FizzBuzz».
-func Solve(input string) string {
+func Solve(n int) []string {
 	// Напишите решение
-	return ""
+	return nil
 }

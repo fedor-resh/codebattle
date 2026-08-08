@@ -2,11 +2,9 @@ package solution
 
 import (
 	"strconv"
-	"strings"
 )
 
-func Solve(input string) string {
-	n, _ := strconv.Atoi(strings.TrimSpace(input))
+func Solve(n int) []string {
 	result := make([]string, 0, n)
 	for i := 1; i <= n; i++ {
 		switch {
@@ -20,5 +18,5 @@ func Solve(input string) string {
 			result = append(result, strconv.Itoa(i))
 		}
 	}
-	return strings.Join(result, ",")
+	return result
 }

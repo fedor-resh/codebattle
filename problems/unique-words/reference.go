@@ -1,15 +1,13 @@
 package solution
 
-import "strings"
-
-func Solve(input string) string {
+func Solve(words []string) []string {
 	seen := map[string]bool{}
 	result := []string{}
-	for _, word := range strings.Fields(input) {
+	for _, word := range words {
 		if !seen[word] {
 			seen[word] = true
 			result = append(result, word)
 		}
 	}
-	return strings.Join(result, ",")
+	return result
 }

@@ -1,10 +1,10 @@
 [
   {
-    "input": "III",
-    "expected": "3"
+    "arguments": ["III"],
+    "expected": 3
   },
   {
-    "input": "MCMXCIV",
-    "expected": "1994"
+    "arguments": ["MCMXCIV"],
+    "expected": 1994
   }
 ]

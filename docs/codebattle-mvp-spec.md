@@ -1101,93 +1101,88 @@ timeout забираются другим consumer через claim.
 Пример `problem.yaml`:
 
 ```yaml
-slug: reverse-string
-version: 1
-title: Разворот строки
-difficulty: easy
-function:
-  name: ReverseString
-  parameters:
-    - name: s
-      type: string
-  returns: string
-allowed_imports:
-  - strings
-  - unicode
-  - unicode/utf8
-limits:
-  compile_ms: 10000
-  run_ms: 2000
-  memory_mb: 256
+slug: binary-search
+title: "Бинарный поиск"
+difficulty: medium
+function: Solve
+signature: "func Solve(nums []int, target int) int"
+version: 2
+time_limit_ms: 2000
+memory_limit_mb: 256
 ```
 
 `starter.go` всегда содержит `package solution`, требуемую экспортируемую функцию
-и при необходимости комментарии, но не решение. Игрок может менять весь файл,
-сохраняя package и сигнатуру. `hidden_test.go` всегда использует внешний пакет
-`solution_test` и обращается к решению только через импорт `solution`.
+`Solve` и при необходимости комментарии, но не решение. Игрок может менять весь
+файл, сохраняя package и точную сигнатуру. `hidden_test.go` использует доверенный
+пакет `solution`, а сгенерированные публичные тесты — внешний пакет
+`solution_test`, чтобы их служебные идентификаторы не конфликтовали с кодом игрока.
 
-`public_tests.json` содержит JSON-значения параметров по имени и ожидаемый
-результат:
+`public_tests.json` содержит подготовленные аргументы в том же порядке, что и
+параметры сигнатуры, и типизированный ожидаемый результат. Игрок получает уже
+готовые Go-значения и возвращает значение своего типа: ему не нужно разбирать
+служебную входную строку или сериализовать ответ обратно в строку.
 
 ```json
 [
   {
-    "name": "basic",
-    "input": { "s": "hello" },
-    "expected": "olleh"
+    "arguments": [[1, 3, 5, 7, 9], 7],
+    "expected": 3
   },
   {
-    "name": "unicode",
-    "input": { "s": "Go界" },
-    "expected": "界oG"
+    "arguments": [[2, 4, 6], 5],
+    "expected": -1
   }
 ]
 ```
 
-Seed-команда генерирует из public JSON тесты `TestPublic_001...`, а
-`hidden_test.go` содержит тесты `TestHidden_001...`. Hidden test при ошибке не
-печатает input/expected/actual; worker определяет номер по имени теста и полностью
-игнорирует его stdout/stderr в пользовательском feedback.
+В MVP поддерживаются `string`, `bool`, `int`, `uint64`, `[]int`, `[]string` и
+`map[string]int`. Seed проверяет количество и типы аргументов, тип результата,
+сигнатуры starter/reference и запускает публичные и скрытые тесты на эталоне.
+
+Judge генерирует из public JSON таблицу вызовов внутри `TestCodebattlePublic`, а
+`hidden_test.go` содержит доверенные проверки `TestHidden...`. Hidden test при
+ошибке не печатает arguments/expected/actual; worker полностью игнорирует его
+stdout/stderr в пользовательском feedback.
 
 Compile workspace имеет фиксированную структуру:
 
 ```text
-/workspace/go.mod                       # module codebattle.local/judge
-/workspace/solution/solution.go         # пользовательский source
-/workspace/solution/public_test.go      # сгенерированные public tests
-/workspace/solution/hidden_test.go      # trusted package solution_test
+/workspace/go.mod                       # module solution
+/workspace/solution.go                  # пользовательский source
+/workspace/public_test.go               # сгенерированные public tests
+/workspace/hidden_test.go               # trusted package solution
 ```
 
-`hidden_test.go` импортирует решение как
-`solution "codebattle.local/judge/solution"`. Компиляция выполняется командой
-`go test -c -trimpath -o /out/judge.test ./solution`.
+`public_test.go` импортирует решение как `solution`, запускает `Solve` с
+типизированными аргументами и сравнивает результат через `reflect.DeepEqual`.
+Компиляция выполняется командой `go test -c -trimpath -o /out/<id>/tests .`.
 
 ### 11.2. Стартовые задачи
 
 | № | Slug | Сигнатура | Уточнение контракта |
 |---:|---|---|---|
-| 1 | `sum-two` | `func Sum(a, b int) int` | Обычное сложение. |
-| 2 | `max-two` | `func Max(a, b int) int` | При равенстве вернуть это значение. |
-| 3 | `is-even` | `func IsEven(n int) bool` | Работает и для отрицательных чисел. |
-| 4 | `factorial` | `func Factorial(n int) int64` | `0 <= n <= 20`. |
-| 5 | `reverse-string` | `func ReverseString(s string) string` | Разворот по Unicode code points, не bytes. |
-| 6 | `is-palindrome` | `func IsPalindrome(s string) bool` | Точное сравнение rune, регистр значим. |
-| 7 | `count-vowels` | `func CountVowels(s string) int` | ASCII `a,e,i,o,u`, регистр не важен. |
-| 8 | `sum-slice` | `func SumSlice(nums []int) int` | Пустой slice дает 0. |
-| 9 | `max-in-slice` | `func MaxInSlice(nums []int) int` | Вход гарантированно непустой. |
-| 10 | `count-occurrences` | `func CountOccurrences(nums []int, target int) int` | Считать точные совпадения. |
-| 11 | `unique-sorted` | `func UniqueSorted(nums []int) []int` | Вернуть уникальные значения по возрастанию. |
-| 12 | `two-sum-exists` | `func TwoSumExists(nums []int, target int) bool` | Использовать два разных индекса. |
-| 13 | `rotate-left` | `func RotateLeft(nums []int, k int) []int` | `k >= 0`; пустой slice допустим. |
-| 14 | `merge-sorted` | `func MergeSorted(a, b []int) []int` | Оба входа отсортированы по возрастанию. |
-| 15 | `binary-search` | `func BinarySearch(nums []int, target int) int` | Вернуть любой найденный индекс или -1. |
-| 16 | `greatest-common-divisor` | `func GCD(a, b int) int` | Вернуть неотрицательный GCD; входы могут быть отрицательными. |
-| 17 | `fibonacci` | `func Fibonacci(n int) int64` | `0 <= n <= 92`, `F(0)=0`, `F(1)=1`. |
-| 18 | `word-frequency` | `func WordFrequency(words []string) map[string]int` | Регистр и пустая строка значимы. |
-| 19 | `valid-brackets` | `func ValidBrackets(s string) bool` | Только символы `()[]{}`. |
-| 20 | `longest-common-prefix` | `func LongestCommonPrefix(words []string) string` | Пустой список дает пустую строку. |
+| 1 | `anagram` | `func Solve(first, second string) bool` | Проверить, являются ли строки анаграммами. |
+| 2 | `balanced-brackets` | `func Solve(text string) bool` | Проверить корректность скобочной последовательности. |
+| 3 | `binary-search` | `func Solve(nums []int, target int) int` | Вернуть индекс цели или `-1`. |
+| 4 | `caesar-cipher` | `func Solve(text string, shift int) string` | Сдвинуть латинские буквы, сохранив регистр. |
+| 5 | `count-vowels` | `func Solve(text string) int` | Посчитать гласные без строкового преобразования результата. |
+| 6 | `factorial` | `func Solve(n int) uint64` | Вычислить факториал. |
+| 7 | `fibonacci` | `func Solve(n int) uint64` | Вернуть `n`-е число Фибоначчи. |
+| 8 | `fizz-buzz` | `func Solve(n int) []string` | Вернуть готовый список элементов. |
+| 9 | `gcd` | `func Solve(a, b int) int` | Вернуть неотрицательный НОД. |
+| 10 | `longest-word` | `func Solve(text string) string` | Найти самое длинное слово. |
+| 11 | `max-number` | `func Solve(nums []int) int` | Найти максимум в готовом slice. |
+| 12 | `merge-sorted` | `func Solve(left, right []int) []int` | Слить два отсортированных slice. |
+| 13 | `palindrome` | `func Solve(text string) bool` | Проверить строку и вернуть `bool`. |
+| 14 | `reverse-string` | `func Solve(input string) string` | Развернуть строку по Unicode code points. |
+| 15 | `roman-to-int` | `func Solve(roman string) int` | Преобразовать римское число сразу в `int`. |
+| 16 | `rotate-array` | `func Solve(nums []int, k int) []int` | Вернуть повернутый slice. |
+| 17 | `sum-numbers` | `func Solve(nums []int) int` | Суммировать готовый slice чисел. |
+| 18 | `two-sum` | `func Solve(nums []int, target int) []int` | Вернуть индексы подходящей пары. |
+| 19 | `unique-words` | `func Solve(words []string) []string` | Вернуть готовый список уникальных слов. |
+| 20 | `word-frequency` | `func Solve(words []string) map[string]int` | Вернуть таблицу частот без сериализации. |
 
-Для каждой задачи требуется не менее трех public и десяти hidden cases,
+Для каждой задачи в MVP требуется не менее двух public и трех hidden cases,
 включая граничные значения. Hidden tests не должны зависеть от случайности,
 времени, сети или порядка map iteration.
 

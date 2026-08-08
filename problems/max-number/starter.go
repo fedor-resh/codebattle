@@ -1,7 +1,7 @@
 package solution
 
 // Solve решает задачу «Максимальное число».
-func Solve(input string) string {
+func Solve(nums []int) int {
 	// Напишите решение
-	return ""
+	return 0
 }

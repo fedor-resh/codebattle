@@ -1,10 +1,10 @@
 [
   {
-    "input": "3 9 2",
-    "expected": "9"
+    "arguments": [[3, 9, 2]],
+    "expected": 9
   },
   {
-    "input": "-7 -2 -10",
-    "expected": "-2"
+    "arguments": [[-7, -2, -10]],
+    "expected": -2
   }
 ]

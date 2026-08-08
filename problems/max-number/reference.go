@@ -1,18 +1,11 @@
 package solution
 
-import (
-	"strconv"
-	"strings"
-)
-
-func Solve(input string) string {
-	fields := strings.Fields(input)
-	maximum, _ := strconv.Atoi(fields[0])
-	for _, field := range fields[1:] {
-		value, _ := strconv.Atoi(field)
+func Solve(nums []int) int {
+	maximum := nums[0]
+	for _, value := range nums[1:] {
 		if value > maximum {
 			maximum = value
 		}
 	}
-	return strconv.Itoa(maximum)
+	return maximum
 }

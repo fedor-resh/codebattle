@@ -5,6 +5,10 @@ import type { Problem } from '../api/client';
 const difficultyLabel = { easy: 'Простая', medium: 'Средняя', hard: 'Сложная' };
 const difficultyColor = { easy: 'green', medium: 'yellow', hard: 'red' };
 
+function formatValue(value: unknown): string {
+  return JSON.stringify(value, null, 2) ?? String(value);
+}
+
 export function ProblemPanel({ problem }: { problem: Problem }) {
   return (
     <Paper withBorder p="lg" h="100%">
@@ -25,10 +29,10 @@ export function ProblemPanel({ problem }: { problem: Problem }) {
           <Code block>{problem.function_signature}</Code>
           <Accordion variant="contained" defaultValue="example-0">
             {problem.public_tests.map((example, index) => (
-              <Accordion.Item key={`${example.input}-${index}`} value={`example-${index}`}>
+              <Accordion.Item key={`example-${index}`} value={`example-${index}`}>
                 <Accordion.Control>Пример {index + 1}</Accordion.Control>
                 <Accordion.Panel>
-                  <Code block>{`Input:  ${JSON.stringify(example.input)}\nOutput: ${JSON.stringify(example.expected)}`}</Code>
+                  <Code block>{`Аргументы:\n${formatValue(example.arguments ?? [example.input])}\n\nРезультат:\n${formatValue(example.expected)}`}</Code>
                 </Accordion.Panel>
               </Accordion.Item>
             ))}

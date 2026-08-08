@@ -1,15 +1,8 @@
 package solution
 
-import (
-	"strconv"
-	"strings"
-)
-
-func Solve(input string) string {
-	parts := strings.SplitN(input, "|", 2)
-	shift, _ := strconv.Atoi(parts[0])
+func Solve(text string, shift int) string {
 	shift = ((shift % 26) + 26) % 26
-	result := []rune(parts[1])
+	result := []rune(text)
 	for index, char := range result {
 		switch {
 		case char >= 'a' && char <= 'z':

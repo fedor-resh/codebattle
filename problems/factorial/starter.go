@@ -1,7 +1,7 @@
 package solution
 
 // Solve решает задачу «Факториал».
-func Solve(input string) string {
+func Solve(n int) uint64 {
 	// Напишите решение
-	return ""
+	return 0
 }

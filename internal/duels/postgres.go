@@ -231,7 +231,12 @@ func (r *PostgresRepository) AcceptInvitation(
 	}
 	var problemVersionID string
 	if err := tx.QueryRow(ctx, `
-		SELECT id FROM problem_versions ORDER BY random() LIMIT 1
+		SELECT id FROM (
+			SELECT DISTINCT ON (slug) id, slug
+			FROM problem_versions
+			ORDER BY slug, version DESC
+		) latest
+		ORDER BY random() LIMIT 1
 	`).Scan(&problemVersionID); errors.Is(err, pgx.ErrNoRows) {
 		return Match{}, ErrProblemsMissing
 	} else if err != nil {
@@ -439,17 +444,29 @@ func (r *PostgresRepository) Ready(ctx context.Context, matchID, userID string, 
 	} else {
 		var nextProblemID string
 		err = tx.QueryRow(ctx, `
-			SELECT id FROM problem_versions
-			WHERE NOT (id = ANY (
-				SELECT jsonb_array_elements_text($1::jsonb)
-			))
+			WITH latest AS (
+				SELECT DISTINCT ON (slug) id, slug
+				FROM problem_versions
+				ORDER BY slug, version DESC
+			), seen_slugs AS (
+				SELECT slug FROM problem_versions
+				WHERE id = ANY (SELECT jsonb_array_elements_text($1::jsonb))
+			)
+			SELECT id FROM latest
+			WHERE slug NOT IN (SELECT slug FROM seen_slugs)
 			ORDER BY random() LIMIT 1
 		`, history).Scan(&nextProblemID)
 		resetHistory := false
 		if errors.Is(err, pgx.ErrNoRows) {
 			resetHistory = true
 			err = tx.QueryRow(ctx, `
-				SELECT id FROM problem_versions WHERE id <> $1 ORDER BY random() LIMIT 1
+				SELECT id FROM (
+					SELECT DISTINCT ON (slug) id, slug
+					FROM problem_versions
+					ORDER BY slug, version DESC
+				) latest
+				WHERE slug <> (SELECT slug FROM problem_versions WHERE id = $1)
+				ORDER BY random() LIMIT 1
 			`, currentProblemID).Scan(&nextProblemID)
 		}
 		if err != nil {

@@ -93,7 +93,7 @@ function TestCaseCard({ testCase }: { testCase: SubmissionTestCase }) {
         ) : (
           <>
             <SimpleGrid cols={{ base: 1, sm: 3 }} spacing="sm">
-              <TestValue label="Вход" value={testCase.input ?? ''} />
+              <TestValue label="Аргументы" value={testCase.input ?? ''} />
               <TestValue label="Ожидалось" value={testCase.expected ?? ''} />
               <TestValue
                 label={testCase.actual_truncated ? 'Получено (сокращено)' : 'Получено'}
