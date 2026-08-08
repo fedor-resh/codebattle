@@ -13,6 +13,9 @@ type repositoryStub struct {
 	createdReceiverID string
 	createdAt         time.Time
 	expiresAt         time.Time
+	updatedRevision   int64
+	updatedCursorLine int
+	updatedCursorCol  int
 }
 
 func (r *repositoryStub) CreateInvitation(
@@ -48,7 +51,16 @@ func (*repositoryStub) LeaveMatch(context.Context, string, string, time.Time) er
 	return nil
 }
 
-func (*repositoryStub) UpdateCode(context.Context, string, string, string, int64, time.Time) error {
+func (r *repositoryStub) UpdateCode(
+	_ context.Context,
+	_, _, _ string,
+	revision int64,
+	cursorLine, cursorColumn int,
+	_ time.Time,
+) error {
+	r.updatedRevision = revision
+	r.updatedCursorLine = cursorLine
+	r.updatedCursorCol = cursorColumn
 	return nil
 }
 
@@ -82,5 +94,30 @@ func TestCreateInvitationRejectsSelf(t *testing.T) {
 	_, err := service.CreateInvitation(context.Background(), "same-user", "same-user")
 	if !errors.Is(err, ErrSelfInvitation) {
 		t.Fatalf("error = %v, want ErrSelfInvitation", err)
+	}
+}
+
+func TestUpdateCodeForwardsCursorPosition(t *testing.T) {
+	repository := &repositoryStub{}
+	service := NewService(repository)
+
+	if err := service.UpdateCode(context.Background(), "user", "match", "package solution", 7, 12, 4); err != nil {
+		t.Fatal(err)
+	}
+	if repository.updatedRevision != 7 || repository.updatedCursorLine != 12 || repository.updatedCursorCol != 4 {
+		t.Fatalf(
+			"revision/cursor = %d/%d:%d",
+			repository.updatedRevision,
+			repository.updatedCursorLine,
+			repository.updatedCursorCol,
+		)
+	}
+}
+
+func TestUpdateCodeRejectsInvalidCursor(t *testing.T) {
+	service := NewService(&repositoryStub{})
+	err := service.UpdateCode(context.Background(), "user", "match", "package solution", 1, 0, 1)
+	if !errors.Is(err, ErrInvalidCursor) {
+		t.Fatalf("error = %v, want ErrInvalidCursor", err)
 	}
 }

@@ -17,8 +17,10 @@ type createInvitationRequest struct {
 }
 
 type updateCodeRequest struct {
-	SourceCode string `json:"source_code"`
-	Revision   int64  `json:"revision"`
+	SourceCode   string `json:"source_code"`
+	Revision     int64  `json:"revision"`
+	CursorLine   int    `json:"cursor_line"`
+	CursorColumn int    `json:"cursor_column"`
 }
 
 func (h duelHandlers) createInvitation(w http.ResponseWriter, r *http.Request) {
@@ -112,8 +114,16 @@ func (h duelHandlers) updateCode(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, http.StatusBadRequest, "INVALID_REQUEST", "Передайте source_code и revision", nil)
 		return
 	}
+	// Keep the endpoint compatible with clients deployed before cursor sharing.
+	if input.CursorLine == 0 {
+		input.CursorLine = 1
+	}
+	if input.CursorColumn == 0 {
+		input.CursorColumn = 1
+	}
 	if err := h.service.UpdateCode(
 		r.Context(), user.ID, r.PathValue("id"), input.SourceCode, input.Revision,
+		input.CursorLine, input.CursorColumn,
 	); err != nil {
 		h.writeDuelError(w, r, err)
 		return
@@ -158,6 +168,8 @@ func (h duelHandlers) writeDuelError(w http.ResponseWriter, r *http.Request, err
 		writeError(w, r, http.StatusConflict, "STALE_REVISION", "Получена устаревшая версия кода", nil)
 	case errors.Is(err, duels.ErrSourceTooLarge):
 		writeError(w, r, http.StatusRequestEntityTooLarge, "SOURCE_TOO_LARGE", "Максимальный размер исходника — 64 КБ", nil)
+	case errors.Is(err, duels.ErrInvalidCursor):
+		writeError(w, r, http.StatusBadRequest, "INVALID_CURSOR", "Некорректная позиция курсора", nil)
 	default:
 		writeError(w, r, http.StatusInternalServerError, "INTERNAL_ERROR", "Внутренняя ошибка сервера", nil)
 	}

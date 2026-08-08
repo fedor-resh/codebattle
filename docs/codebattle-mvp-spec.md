@@ -259,7 +259,7 @@ Route guard вызывает `GET /api/v1/me`. Гость на защищенн�
 | `MatchHeader` | `Paper`, `Group`, `Badge` | Игроки, счет, раунд и состояние. |
 | `ScoreDisplay` | `Group`, `Text`, `Avatar` | Доступное текстовое представление счета. |
 | `ProblemPanel` | `Paper`, `ScrollArea`, `Accordion` | Markdown-условие, сигнатура и public tests. |
-| `CodePane` | `Paper`, `Badge`, Monaco | Заголовок владельца и редактор. |
+| `CodePane` | `Paper`, `Badge`, Monaco | Заголовок владельца, редактор и каретка соперника с username. |
 | `JudgeResultPanel` | `Alert`, `Code`, `Accordion` | Статус и безопасная диагностическая информация. |
 | `ConnectionStatus` | `Badge`, `Loader` | Online, reconnecting, paused, disconnected. |
 | `ReadyOverlay` | `Overlay`, `Center`, `Button` | Победитель и готовность игроков. |
@@ -511,6 +511,8 @@ Server envelope:
     "roundId": "uuid-v7",
     "baseRevision": 41,
     "revision": 42,
+    "cursorLine": 4,
+    "cursorColumn": 7,
     "source": "package solution\n\nfunc Sum(a, b int) int {\n\treturn a + b\n}\n"
   }
 }
@@ -536,7 +538,7 @@ Server envelope:
 | `match.resumed` | `matchId`, `resumedAt`. |
 | `match.ended` | `matchId`, `reason`, `finalScore`. |
 | `editor.ack` | `roundId`, `revision`, `requestId`. |
-| `editor.snapshot` | `roundId`, `userId`, `revision`, `source`. |
+| `editor.snapshot` | `roundId`, `userId`, `revision`, `source`, `cursorLine`, `cursorColumn`. |
 | `submission.updated` | Submission resource без source. |
 | `round.finished` | `roundId`, `winnerId`, `score`, `finishedAt`. |
 | `round.ready_state` | `roundId`, ready-флаги игроков. |
@@ -1031,6 +1033,8 @@ Primary key `(round_id, user_id)`. Сервис проверяет, что user 
 | `user_id` | `uuid` | FK users. |
 | `source` | `text` | NOT NULL, <= 65536 UTF-8 bytes. |
 | `revision` | `bigint` | NOT NULL, >= 0. |
+| `cursor_line` | `integer` | NOT NULL, > 0. |
+| `cursor_column` | `integer` | NOT NULL, > 0. |
 | `updated_at` | `timestamptz` | NOT NULL. |
 
 Primary key `(round_id, user_id)`. Update разрешен только при большей revision.

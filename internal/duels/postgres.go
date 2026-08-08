@@ -353,13 +353,15 @@ func (r *PostgresRepository) UpdateCode(
 	ctx context.Context,
 	matchID, userID, source string,
 	revision int64,
+	cursorLine, cursorColumn int,
 	now time.Time,
 ) error {
 	result, err := r.pool.Exec(ctx, `
 		INSERT INTO match_code_snapshots (
-			match_id, user_id, problem_version_id, source_code, revision, updated_at
+			match_id, user_id, problem_version_id, source_code, revision,
+			cursor_line, cursor_column, updated_at
 		)
-		SELECT m.id, $2, m.problem_version_id, $3, $4, $5
+		SELECT m.id, $2, m.problem_version_id, $3, $4, $5, $6, $7
 		FROM matches m
 		WHERE m.id = $1 AND m.state = 'active'
 			AND (m.player_one_id = $2 OR m.player_two_id = $2)
@@ -367,10 +369,12 @@ func (r *PostgresRepository) UpdateCode(
 			problem_version_id = EXCLUDED.problem_version_id,
 			source_code = EXCLUDED.source_code,
 			revision = EXCLUDED.revision,
+			cursor_line = EXCLUDED.cursor_line,
+			cursor_column = EXCLUDED.cursor_column,
 			updated_at = EXCLUDED.updated_at
 		WHERE match_code_snapshots.problem_version_id <> EXCLUDED.problem_version_id
 			OR match_code_snapshots.revision < EXCLUDED.revision
-	`, matchID, userID, source, revision, now)
+	`, matchID, userID, source, revision, cursorLine, cursorColumn, now)
 	if err != nil {
 		return err
 	}
@@ -531,7 +535,9 @@ const matchQuery = `
 				'user_id', snapshot.user_id,
 				'problem_version_id', snapshot.problem_version_id,
 				'source_code', snapshot.source_code,
-				'revision', snapshot.revision
+				'revision', snapshot.revision,
+				'cursor_line', snapshot.cursor_line,
+				'cursor_column', snapshot.cursor_column
 			) ORDER BY snapshot.user_id)
 			FROM match_code_snapshots snapshot WHERE snapshot.match_id = m.id
 		), '[]'::jsonb)::text,

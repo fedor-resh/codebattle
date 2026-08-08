@@ -21,6 +21,7 @@ var (
 	ErrRoundNotActive  = errors.New("round is not active")
 	ErrStaleRevision   = errors.New("stale editor revision")
 	ErrSourceTooLarge  = errors.New("source is too large")
+	ErrInvalidCursor   = errors.New("invalid editor cursor")
 )
 
 const invitationTTL = 30 * time.Second
@@ -60,6 +61,8 @@ type CodeSnapshot struct {
 	ProblemVersionID string `json:"problem_version_id"`
 	SourceCode       string `json:"source_code"`
 	Revision         int64  `json:"revision"`
+	CursorLine       int    `json:"cursor_line"`
+	CursorColumn     int    `json:"cursor_column"`
 }
 
 type Problem struct {
@@ -88,7 +91,7 @@ type Repository interface {
 	DeclineInvitation(context.Context, string, string, time.Time) error
 	Match(context.Context, string, string) (Match, error)
 	LeaveMatch(context.Context, string, string, time.Time) error
-	UpdateCode(context.Context, string, string, string, int64, time.Time) error
+	UpdateCode(context.Context, string, string, string, int64, int, int, time.Time) error
 	Ready(context.Context, string, string, time.Time) (Match, error)
 }
 
@@ -129,11 +132,21 @@ func (s *Service) LeaveMatch(ctx context.Context, userID, matchID string) error 
 	return s.repository.LeaveMatch(ctx, matchID, userID, s.now().UTC())
 }
 
-func (s *Service) UpdateCode(ctx context.Context, userID, matchID, source string, revision int64) error {
+func (s *Service) UpdateCode(
+	ctx context.Context,
+	userID, matchID, source string,
+	revision int64,
+	cursorLine, cursorColumn int,
+) error {
 	if len([]byte(source)) > 64*1024 {
 		return ErrSourceTooLarge
 	}
-	return s.repository.UpdateCode(ctx, matchID, userID, source, revision, s.now().UTC())
+	if cursorLine < 1 || cursorColumn < 1 || cursorLine > 1_000_000 || cursorColumn > 1_000_000 {
+		return ErrInvalidCursor
+	}
+	return s.repository.UpdateCode(
+		ctx, matchID, userID, source, revision, cursorLine, cursorColumn, s.now().UTC(),
+	)
 }
 
 func (s *Service) Ready(ctx context.Context, userID, matchID string) (Match, error) {

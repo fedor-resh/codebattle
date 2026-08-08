@@ -41,6 +41,32 @@ body {
   display: none;
 }
 
+.opponent-cursor-widget {
+  position: relative;
+  z-index: 20;
+  width: 2px;
+  height: 19px;
+  border-left: 2px solid var(--mantine-color-indigo-5);
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--mantine-color-indigo-5) 70%, transparent));
+  pointer-events: none;
+}
+
+.opponent-cursor-widget__label {
+  position: absolute;
+  top: 100%;
+  left: -2px;
+  padding: 2px 6px;
+  border-radius: 0 var(--mantine-radius-xs) var(--mantine-radius-xs) var(--mantine-radius-xs);
+  background: var(--mantine-color-indigo-6);
+  color: var(--mantine-color-white);
+  font-family: var(--mantine-font-family);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.4;
+  white-space: nowrap;
+  box-shadow: var(--mantine-shadow-xs);
+}
+
 @media (min-width: 75em) {
   .visible-from-lg {
     display: grid;

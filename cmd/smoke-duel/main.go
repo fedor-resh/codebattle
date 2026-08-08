@@ -25,8 +25,10 @@ type problem struct {
 }
 
 type snapshot struct {
-	UserID   string `json:"user_id"`
-	Revision int64  `json:"revision"`
+	UserID       string `json:"user_id"`
+	Revision     int64  `json:"revision"`
+	CursorLine   int    `json:"cursor_line"`
+	CursorColumn int    `json:"cursor_column"`
 }
 
 type match struct {
@@ -101,8 +103,10 @@ func main() {
 	must(err)
 
 	aliceClient.do(http.MethodPut, "/matches/"+game.ID+"/code", map[string]any{
-		"source_code": string(source),
-		"revision":    1,
+		"source_code":   string(source),
+		"revision":      1,
+		"cursor_line":   4,
+		"cursor_column": 7,
 	}, nil)
 	var matchResponse struct {
 		Match match `json:"match"`
@@ -110,9 +114,9 @@ func main() {
 	bobClient.do(http.MethodGet, "/matches/"+game.ID, nil, &matchResponse)
 	visible := false
 	for _, code := range matchResponse.Match.CodeSnapshots {
-		visible = visible || (code.UserID == alice.ID && code.Revision == 1)
+		visible = visible || (code.UserID == alice.ID && code.Revision == 1 && code.CursorLine == 4 && code.CursorColumn == 7)
 	}
-	check(visible, "opponent did not receive editor snapshot")
+	check(visible, "opponent did not receive editor snapshot and cursor")
 
 	wrong := submitAndWait(aliceClient, game.ID, string(wrongSource))
 	check(wrong.Status == "wrong_answer", fmt.Sprintf("wrong solution status %s: %s", wrong.Status, wrong.Result.Message))

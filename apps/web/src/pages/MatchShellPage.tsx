@@ -16,7 +16,7 @@ import {
 import { modals } from '@mantine/modals';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { IconArrowLeft, IconCloudCheck, IconDoorExit, IconPlayerPlay } from '@tabler/icons-react';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import {
@@ -30,7 +30,7 @@ import {
   type Submission,
   type User,
 } from '../api/client';
-import { CodePane } from '../components/CodePane';
+import { CodePane, type CursorPosition } from '../components/CodePane';
 import { JudgeResultPanel } from '../components/JudgeResultPanel';
 import { ProblemPanel } from '../components/ProblemPanel';
 import { ReadyOverlay } from '../components/ReadyOverlay';
@@ -42,6 +42,8 @@ export function MatchShellPage({ currentUser }: { currentUser: User }) {
   const [source, setSource] = useState('');
   const [submissionID, setSubmissionID] = useState('');
   const revision = useRef(0);
+  const sourceRef = useRef('');
+  const cursorRef = useRef<CursorPosition>({ lineNumber: 1, column: 1 });
   const activeProblemID = useRef('');
   const syncTimer = useRef<number | undefined>(undefined);
   const matchQuery = useQuery({
@@ -87,7 +89,13 @@ export function MatchShellPage({ currentUser }: { currentUser: User }) {
       );
       activeProblemID.current = problem.id;
       revision.current = snapshot?.revision ?? 0;
-      setSource(snapshot?.source_code ?? problem.starter_code);
+      const restoredSource = snapshot?.source_code ?? problem.starter_code;
+      sourceRef.current = restoredSource;
+      cursorRef.current = {
+        lineNumber: snapshot?.cursor_line ?? 1,
+        column: snapshot?.cursor_column ?? 1,
+      };
+      setSource(restoredSource);
       setSubmissionID('');
     }
   }, [currentUser.id, matchQuery.data]);
@@ -97,6 +105,47 @@ export function MatchShellPage({ currentUser }: { currentUser: User }) {
       if (syncTimer.current !== undefined) window.clearTimeout(syncTimer.current);
     },
     [],
+  );
+
+  const scheduleEditorSync = useCallback(
+    (nextSource: string, cursor: CursorPosition) => {
+      revision.current += 1;
+      if (syncTimer.current !== undefined) window.clearTimeout(syncTimer.current);
+      const currentRevision = revision.current;
+      syncTimer.current = window.setTimeout(() => {
+        void updateCode(
+          matchId,
+          nextSource,
+          currentRevision,
+          cursor.lineNumber,
+          cursor.column,
+        ).catch(() => undefined);
+      }, 150);
+    },
+    [matchId],
+  );
+
+  const handleSourceChange = useCallback(
+    (value: string) => {
+      sourceRef.current = value;
+      setSource(value);
+      scheduleEditorSync(value, cursorRef.current);
+    },
+    [scheduleEditorSync],
+  );
+
+  const handleCursorChange = useCallback(
+    (position: CursorPosition) => {
+      if (
+        cursorRef.current.lineNumber === position.lineNumber &&
+        cursorRef.current.column === position.column
+      ) {
+        return;
+      }
+      cursorRef.current = position;
+      scheduleEditorSync(sourceRef.current, position);
+    },
+    [scheduleEditorSync],
   );
 
   if (matchQuery.isLoading) {
@@ -136,16 +185,13 @@ export function MatchShellPage({ currentUser }: { currentUser: User }) {
   const currentReady = currentIsPlayerOne ? match.player_one_ready : match.player_two_ready;
   const opponentReady = currentIsPlayerOne ? match.player_two_ready : match.player_one_ready;
   const winner = match.round_winner_id === me.id ? me.username : opponent.username;
-
-  const handleSourceChange = (value: string) => {
-    setSource(value);
-    revision.current += 1;
-    if (syncTimer.current !== undefined) window.clearTimeout(syncTimer.current);
-    const currentRevision = revision.current;
-    syncTimer.current = window.setTimeout(() => {
-      void updateCode(matchId, value, currentRevision).catch(() => undefined);
-    }, 150);
-  };
+  const remoteCursor = opponentSnapshot
+    ? {
+        lineNumber: opponentSnapshot.cursor_line ?? 1,
+        column: opponentSnapshot.cursor_column ?? 1,
+        label: opponent.username,
+      }
+    : undefined;
 
   const confirmLeave = () =>
     modals.openConfirmModal({
@@ -234,8 +280,19 @@ export function MatchShellPage({ currentUser }: { currentUser: User }) {
           <ProblemPanel problem={match.problem} />
           <div className="editor-stack">
             <div className="desktop-editors visible-from-lg">
-              <CodePane label="Ваш код" value={source} onChange={handleSourceChange} readOnly={ended || waitingReady || paused} />
-              <CodePane label={`Код ${opponent.username}`} value={opponentSnapshot?.source_code ?? match.problem.starter_code} readOnly />
+              <CodePane
+                label="Ваш код"
+                value={source}
+                onChange={handleSourceChange}
+                onCursorChange={handleCursorChange}
+                readOnly={ended || waitingReady || paused}
+              />
+              <CodePane
+                label={`Код ${opponent.username}`}
+                value={opponentSnapshot?.source_code ?? match.problem.starter_code}
+                remoteCursor={remoteCursor}
+                readOnly
+              />
             </div>
 
             <Tabs defaultValue="mine" hiddenFrom="lg">
@@ -244,10 +301,21 @@ export function MatchShellPage({ currentUser }: { currentUser: User }) {
                 <Tabs.Tab value="opponent">Код соперника</Tabs.Tab>
               </Tabs.List>
               <Tabs.Panel value="mine" pt="md">
-                <CodePane label="Ваш код" value={source} onChange={handleSourceChange} readOnly={ended || waitingReady || paused} />
+                <CodePane
+                  label="Ваш код"
+                  value={source}
+                  onChange={handleSourceChange}
+                  onCursorChange={handleCursorChange}
+                  readOnly={ended || waitingReady || paused}
+                />
               </Tabs.Panel>
               <Tabs.Panel value="opponent" pt="md">
-                <CodePane label={`Код ${opponent.username}`} value={opponentSnapshot?.source_code ?? match.problem.starter_code} readOnly />
+                <CodePane
+                  label={`Код ${opponent.username}`}
+                  value={opponentSnapshot?.source_code ?? match.problem.starter_code}
+                  remoteCursor={remoteCursor}
+                  readOnly
+                />
               </Tabs.Panel>
             </Tabs>
 

@@ -41,6 +41,8 @@ export type CodeSnapshot = {
   problem_version_id: string;
   source_code: string;
   revision: number;
+  cursor_line: number;
+  cursor_column: number;
 };
 
 export type Problem = {
@@ -228,10 +230,21 @@ export async function getSubmission(submissionId: string): Promise<Submission> {
     .submission;
 }
 
-export async function updateCode(matchId: string, sourceCode: string, revision: number): Promise<void> {
+export async function updateCode(
+  matchId: string,
+  sourceCode: string,
+  revision: number,
+  cursorLine: number,
+  cursorColumn: number,
+): Promise<void> {
   await request(`/api/v1/matches/${matchId}/code`, {
     method: 'PUT',
-    body: JSON.stringify({ source_code: sourceCode, revision }),
+    body: JSON.stringify({
+      source_code: sourceCode,
+      revision,
+      cursor_line: cursorLine,
+      cursor_column: cursorColumn,
+    }),
   });
 }
 
