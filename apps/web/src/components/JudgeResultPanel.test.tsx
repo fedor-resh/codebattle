@@ -15,6 +15,7 @@ const submission: Submission = {
     duration_ms: 124,
     passed_tests: 1,
     total_tests: 2,
+    console_output: 'checking 2 + 2\n',
     test_cases: [
       {
         kind: 'public',
@@ -44,6 +45,8 @@ describe('JudgeResultPanel', () => {
     expect(screen.getByText('2 2')).toBeInTheDocument();
     expect(screen.getByText('4')).toBeInTheDocument();
     expect(screen.getByText('""')).toBeInTheDocument();
+    expect(screen.getByText('Вывод консоли')).toBeInTheDocument();
+    expect(screen.getByText('checking 2 + 2')).toBeInTheDocument();
     expect(screen.getByText('Скрытые тесты')).toBeInTheDocument();
     expect(screen.getByText(/Входные данные скрыты/)).toBeInTheDocument();
   });

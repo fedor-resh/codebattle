@@ -12,10 +12,21 @@ import (
 const publicResultMarker = "__CODEBATTLE_PUBLIC_RESULT__"
 
 type publicResultRecord struct {
-	Index     int    `json:"index"`
-	Actual    string `json:"actual"`
-	Passed    bool   `json:"passed"`
-	Truncated bool   `json:"truncated,omitempty"`
+	Index            int
+	Actual           string
+	ActualAvailable  bool
+	Passed           bool
+	Truncated        bool
+	Console          string
+	ConsoleTruncated bool
+	RuntimeError     string
+}
+
+type publicTestReport struct {
+	TestCases              []TestCaseResult
+	ConsoleOutput          string
+	ConsoleOutputTruncated bool
+	HadRuntimeError        bool
 }
 
 // publicTestSource creates a separate external test package. This keeps the
@@ -36,17 +47,45 @@ func publicTestSource(tests []problems.PublicTest) string {
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"os"
 	codebattleSolution "solution"
 	"testing"
 )
 
 const codebattleActualLimit = 2048
+const codebattleConsoleLimit = 4096
 
 type codebattlePublicResult struct {
-	Index     int
-	Actual    string
-	Passed    bool
-	Truncated bool
+	Index            int
+	Actual           string
+	ActualAvailable  bool
+	Passed           bool
+	Truncated        bool
+	Console          string
+	ConsoleTruncated bool
+	RuntimeError     string
+}
+
+type codebattleLimitedWriter struct {
+	value     []byte
+	truncated bool
+}
+
+func (writer *codebattleLimitedWriter) Write(value []byte) (int, error) {
+	originalLength := len(value)
+	remaining := codebattleConsoleLimit - len(writer.value)
+	if remaining > 0 {
+		if len(value) > remaining {
+			writer.value = append(writer.value, value[:remaining]...)
+			writer.truncated = true
+		} else {
+			writer.value = append(writer.value, value...)
+		}
+	} else if len(value) > 0 {
+		writer.truncated = true
+	}
+	return originalLength, nil
 }
 
 func codebattleDisplayValue(value string) (string, bool) {
@@ -54,6 +93,45 @@ func codebattleDisplayValue(value string) (string, bool) {
 		return value, false
 	}
 	return value[:codebattleActualLimit], true
+}
+
+func codebattleRunSolution(input string) (
+	actual string,
+	actualAvailable bool,
+	console string,
+	consoleTruncated bool,
+	runtimeError string,
+) {
+	read, write, err := os.Pipe()
+	if err != nil {
+		return "", false, "", false, "не удалось захватить вывод программы"
+	}
+
+	previousStdout, previousStderr := os.Stdout, os.Stderr
+	os.Stdout, os.Stderr = write, write
+	captured := &codebattleLimitedWriter{}
+	done := make(chan struct{})
+	go func() {
+		_, _ = io.Copy(captured, read)
+		close(done)
+	}()
+
+	defer func() {
+		_ = write.Close()
+		os.Stdout, os.Stderr = previousStdout, previousStderr
+		<-done
+		_ = read.Close()
+		console = string(captured.value)
+		consoleTruncated = captured.truncated
+		if recovered := recover(); recovered != nil {
+			actualAvailable = false
+			runtimeError, _ = codebattleDisplayValue(fmt.Sprintf("panic: %%v", recovered))
+		}
+	}()
+
+	actual = codebattleSolution.Solve(input)
+	actualAvailable = true
+	return
 }
 
 func TestCodebattlePublic(t *testing.T) {
@@ -64,14 +142,17 @@ func TestCodebattlePublic(t *testing.T) {
 %s	}
 
 	for index, testCase := range tests {
-		actual := codebattleSolution.Solve(testCase.input)
+		actual, actualAvailable, console, consoleTruncated, runtimeError := codebattleRunSolution(testCase.input)
 		displayActual, truncated := codebattleDisplayValue(actual)
 		record, _ := json.Marshal(codebattlePublicResult{
-			Index: index + 1, Actual: displayActual,
-			Passed: actual == testCase.expected, Truncated: truncated,
+			Index: index + 1, Actual: displayActual, ActualAvailable: actualAvailable,
+			Passed: actualAvailable && actual == testCase.expected, Truncated: truncated,
+			Console: console, ConsoleTruncated: consoleTruncated, RuntimeError: runtimeError,
 		})
 		fmt.Printf("%s%%s\n", record)
-		if actual != testCase.expected {
+		if runtimeError != "" {
+			t.Errorf("public case %%d panicked", index+1)
+		} else if actual != testCase.expected {
 			t.Errorf("public case %%d failed", index+1)
 		}
 	}
@@ -79,12 +160,15 @@ func TestCodebattlePublic(t *testing.T) {
 `, cases.String(), publicResultMarker)
 }
 
-func collectTestResults(
+func collectPublicTestReport(
 	output string,
 	publicTests []problems.PublicTest,
 	executionPassed bool,
-) []TestCaseResult {
+) publicTestReport {
 	results := make([]TestCaseResult, len(publicTests), len(publicTests)+1)
+	consoleParts := make([]string, 0, len(publicTests))
+	consoleTruncated := false
+	hadRuntimeError := false
 	for index, testCase := range publicTests {
 		results[index] = TestCaseResult{
 			Kind:     "public",
@@ -109,10 +193,16 @@ func collectTestResults(
 		}
 		result := &results[record.Index-1]
 		result.Actual = record.Actual
-		result.ActualAvailable = true
+		result.ActualAvailable = record.ActualAvailable
 		result.ActualTruncated = record.Truncated
+		result.Error = record.RuntimeError
+		if record.Console != "" {
+			consoleParts = append(consoleParts, fmt.Sprintf("Пример %d:\n%s", record.Index, record.Console))
+		}
+		consoleTruncated = consoleTruncated || record.ConsoleTruncated
+		hadRuntimeError = hadRuntimeError || record.RuntimeError != ""
 		passed := record.Passed
-		if !record.Truncated {
+		if record.ActualAvailable && !record.Truncated {
 			passed = record.Actual == result.Expected
 		}
 		if passed {
@@ -132,14 +222,22 @@ func collectTestResults(
 		}
 	}
 
-	hiddenStatus := "not_run"
-	if executionPassed || strings.Contains(output, "--- PASS: TestHidden") {
-		hiddenStatus = "passed"
-	} else if strings.Contains(output, "--- FAIL: TestHidden") {
-		hiddenStatus = "failed"
+	return publicTestReport{
+		TestCases:              results,
+		ConsoleOutput:          strings.Join(consoleParts, "\n\n"),
+		ConsoleOutputTruncated: consoleTruncated,
+		HadRuntimeError:        hadRuntimeError,
 	}
-	results = append(results, TestCaseResult{Kind: "hidden", Status: hiddenStatus})
-	return results
+}
+
+func hiddenTestResult(output string, executionPassed bool) TestCaseResult {
+	status := "not_run"
+	if executionPassed || strings.Contains(output, "--- PASS: TestHidden") {
+		status = "passed"
+	} else if strings.Contains(output, "--- FAIL: TestHidden") {
+		status = "failed"
+	}
+	return TestCaseResult{Kind: "hidden", Status: status}
 }
 
 func failedTestMessage(testCases []TestCaseResult) string {

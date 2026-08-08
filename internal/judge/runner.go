@@ -34,12 +34,14 @@ type Config struct {
 }
 
 type Result struct {
-	Status      string           `json:"status"`
-	Message     string           `json:"message"`
-	DurationMS  int64            `json:"duration_ms"`
-	PassedTests int              `json:"passed_tests,omitempty"`
-	TotalTests  int              `json:"total_tests,omitempty"`
-	TestCases   []TestCaseResult `json:"test_cases,omitempty"`
+	Status                 string           `json:"status"`
+	Message                string           `json:"message"`
+	DurationMS             int64            `json:"duration_ms"`
+	PassedTests            int              `json:"passed_tests,omitempty"`
+	TotalTests             int              `json:"total_tests,omitempty"`
+	TestCases              []TestCaseResult `json:"test_cases,omitempty"`
+	ConsoleOutput          string           `json:"console_output"`
+	ConsoleOutputTruncated bool             `json:"console_output_truncated,omitempty"`
 }
 
 type TestCaseResult struct {
@@ -51,6 +53,7 @@ type TestCaseResult struct {
 	Actual          string `json:"actual,omitempty"`
 	ActualAvailable bool   `json:"actual_available,omitempty"`
 	ActualTruncated bool   `json:"actual_truncated,omitempty"`
+	Error           string `json:"error,omitempty"`
 }
 
 type Runner struct {
@@ -181,31 +184,51 @@ func (r *Runner) Run(
 		return result
 	}
 
-	testLimit := solutionTimeLimit(job)
-	// The solution timeout is enforced by the Go test binary. The outer limit
-	// additionally covers Docker startup and shutdown, which can be noticeably
-	// slower on a cold host and must not count as the player's execution time.
-	testCtx, cancelTest := context.WithTimeout(ctx, testLimit+5*time.Second)
-	testOutput, testErr, testTimedOut := r.dockerCommand(
-		testCtx,
-		"codebattle-run-"+job.ID,
-		r.runtimeArgs(job),
+	publicOutput, publicErr, publicTimedOut := r.runTests(
+		ctx,
+		"codebattle-run-public-"+job.ID,
+		job,
+		"^TestCodebattlePublic$",
 	)
-	cancelTest()
-	result.TestCases = collectTestResults(testOutput, job.PublicTests, testErr == nil)
-	result.TotalTests = len(result.TestCases)
-	for _, testCase := range result.TestCases {
-		if testCase.Status == "passed" {
-			result.PassedTests++
-		}
-	}
-	if testTimedOut || strings.Contains(testOutput, "panic: test timed out") {
+	publicReport := collectPublicTestReport(publicOutput, job.PublicTests, publicErr == nil)
+	result.TestCases = publicReport.TestCases
+	result.ConsoleOutput = publicReport.ConsoleOutput
+	result.ConsoleOutputTruncated = publicReport.ConsoleOutputTruncated
+	if publicTimedOut || strings.Contains(publicOutput, "panic: test timed out") {
+		result.TestCases = append(result.TestCases, TestCaseResult{Kind: "hidden", Status: "not_run"})
+		r.summarizeTests(&result)
 		result.Status = "time_limit"
 		result.Message = "Превышен лимит времени"
 		return result
 	}
-	if testErr != nil {
-		if strings.Contains(testOutput, "panic:") || strings.Contains(testOutput, "fatal error:") {
+	if publicErr != nil {
+		result.TestCases = append(result.TestCases, TestCaseResult{Kind: "hidden", Status: "not_run"})
+		r.summarizeTests(&result)
+		if publicReport.HadRuntimeError || strings.Contains(publicOutput, "panic:") || strings.Contains(publicOutput, "fatal error:") {
+			result.Status = "runtime_error"
+			result.Message = "Ошибка выполнения"
+		} else {
+			result.Status = "wrong_answer"
+			result.Message = failedTestMessage(result.TestCases)
+		}
+		return result
+	}
+
+	hiddenOutput, hiddenErr, hiddenTimedOut := r.runTests(
+		ctx,
+		"codebattle-run-hidden-"+job.ID,
+		job,
+		"^TestHidden$",
+	)
+	result.TestCases = append(result.TestCases, hiddenTestResult(hiddenOutput, hiddenErr == nil))
+	r.summarizeTests(&result)
+	if hiddenTimedOut || strings.Contains(hiddenOutput, "panic: test timed out") {
+		result.Status = "time_limit"
+		result.Message = "Превышен лимит времени"
+		return result
+	}
+	if hiddenErr != nil {
+		if strings.Contains(hiddenOutput, "panic:") || strings.Contains(hiddenOutput, "fatal error:") {
 			result.Status = "runtime_error"
 			result.Message = "Ошибка выполнения"
 		} else {
@@ -217,6 +240,29 @@ func (r *Runner) Run(
 	result.Status = "accepted"
 	result.Message = "Все тесты пройдены"
 	return result
+}
+
+func (r *Runner) runTests(
+	ctx context.Context,
+	containerName string,
+	job submissions.Job,
+	testPattern string,
+) (string, error, bool) {
+	testLimit := solutionTimeLimit(job)
+	// The test binary owns the solution limit. The outer allowance covers only
+	// Docker startup and shutdown, which must not count as execution time.
+	testCtx, cancelTest := context.WithTimeout(ctx, testLimit+5*time.Second)
+	defer cancelTest()
+	return r.dockerCommand(testCtx, containerName, r.runtimeArgs(job, testPattern))
+}
+
+func (r *Runner) summarizeTests(result *Result) {
+	result.TotalTests = len(result.TestCases)
+	for _, testCase := range result.TestCases {
+		if testCase.Status == "passed" {
+			result.PassedTests++
+		}
+	}
 }
 
 func (r *Runner) prepare(job submissions.Job) error {
@@ -289,7 +335,7 @@ func (r *Runner) compileArgs(job submissions.Job) []string {
 	)
 }
 
-func (r *Runner) runtimeArgs(job submissions.Job) []string {
+func (r *Runner) runtimeArgs(job submissions.Job, testPattern string) []string {
 	memory := strconv.Itoa(max(job.MemoryLimitMB, 32)) + "m"
 	args := []string{
 		"run", "--rm", "--network", "none", "--read-only",
@@ -305,7 +351,8 @@ func (r *Runner) runtimeArgs(job submissions.Job) []string {
 		"-v", r.config.BinaryVolume+":/out:ro",
 		"-w", "/out/"+job.ID,
 		r.config.Image,
-		"./tests", "-test.v", "-test.timeout="+solutionTimeLimit(job).String(),
+		"./tests", "-test.v", "-test.run="+testPattern,
+		"-test.timeout="+solutionTimeLimit(job).String(),
 	)
 }
 

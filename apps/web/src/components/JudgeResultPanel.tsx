@@ -18,6 +18,7 @@ import {
   IconEyeOff,
   IconFlask,
   IconPlayerPause,
+  IconTerminal2,
   IconX,
 } from '@tabler/icons-react';
 
@@ -51,7 +52,7 @@ function TestValue({ label, value }: { label: string; value?: string }) {
         {label}
       </Text>
       <Code block style={{ minHeight: 42, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
-        {value === undefined ? '—' : value === '' ? '""' : value}
+        {value === undefined ? 'Функция не вернула значение' : value === '' ? '""' : value}
       </Code>
     </Stack>
   );
@@ -104,6 +105,13 @@ function TestCaseCard({ testCase }: { testCase: SubmissionTestCase }) {
                 Фактический вывод не попал в отчёт, но проверка завершилась успешно.
               </Text>
             )}
+            {testCase.error && (
+              <Alert color="red" variant="light" title="Ошибка выполнения">
+                <Code block style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+                  {testCase.error}
+                </Code>
+              </Alert>
+            )}
           </>
         )}
       </Stack>
@@ -151,6 +159,8 @@ export function JudgeResultPanel({ submission }: { submission?: Submission }) {
   const technicalMessage = ['compile_error', 'runtime_error', 'internal_error'].includes(
     submission.status,
   );
+  const hasConsoleReport = submission.result?.console_output !== undefined;
+  const consoleOutput = submission.result?.console_output ?? '';
 
   return (
     <Alert color={accepted ? 'green' : internal ? 'yellow' : 'red'} icon={<Icon size={18} />}>
@@ -177,6 +187,45 @@ export function JudgeResultPanel({ submission }: { submission?: Submission }) {
               <Text size="sm">{submission.result.message}</Text>
             ))}
         </Stack>
+
+        {hasConsoleReport && (
+          <Paper withBorder p="sm" radius="md">
+            <Stack gap="xs">
+              <Group justify="space-between" gap="xs">
+                <Group gap="xs">
+                  <ThemeIcon color="gray" variant="light" radius="xl" size="md">
+                    <IconTerminal2 size={15} aria-hidden="true" />
+                  </ThemeIcon>
+                  <Text size="sm" fw={650}>
+                    Вывод консоли
+                  </Text>
+                </Group>
+                <Badge color="gray" variant="light">
+                  stdout / stderr
+                </Badge>
+              </Group>
+              <Code
+                block
+                style={{
+                  maxHeight: 220,
+                  overflow: 'auto',
+                  whiteSpace: 'pre-wrap',
+                  overflowWrap: 'anywhere',
+                }}
+              >
+                {consoleOutput ||
+                  (submission.status === 'compile_error'
+                    ? 'Код не запускался.'
+                    : 'Код ничего не вывел в консоль.')}
+              </Code>
+              {submission.result?.console_output_truncated && (
+                <Text size="xs" c="dimmed">
+                  Вывод сокращён из-за ограничения размера.
+                </Text>
+              )}
+            </Stack>
+          </Paper>
+        )}
 
         {testCases.length > 0 && (
           <Stack gap="sm">

@@ -79,6 +79,7 @@ export type SubmissionTestCase = {
   actual?: string;
   actual_available?: boolean;
   actual_truncated?: boolean;
+  error?: string;
 };
 
 export type Submission = {
@@ -92,6 +93,8 @@ export type Submission = {
     passed_tests?: number;
     total_tests?: number;
     test_cases?: SubmissionTestCase[];
+    console_output?: string;
+    console_output_truncated?: boolean;
   };
   created_at: string;
 };

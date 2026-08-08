@@ -3,6 +3,7 @@ package judge
 import (
 	"go/format"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -39,7 +40,7 @@ func TestCompileAndRuntimeContainersAreIsolated(t *testing.T) {
 		}
 	}
 
-	runtime := strings.Join(runner.runtimeArgs(job), " ")
+	runtime := strings.Join(runner.runtimeArgs(job, "^TestHidden$"), " ")
 	if strings.Contains(runtime, "source-volume") {
 		t.Fatalf("runtime container can access sources: %s", runtime)
 	}
@@ -48,6 +49,9 @@ func TestCompileAndRuntimeContainersAreIsolated(t *testing.T) {
 	}
 	if !strings.Contains(runtime, "-test.timeout=2s") {
 		t.Fatalf("runtime binary does not enforce the solution timeout: %s", runtime)
+	}
+	if !strings.Contains(runtime, "-test.run=^TestHidden$") {
+		t.Fatalf("runtime binary does not select the requested test phase: %s", runtime)
 	}
 }
 
@@ -63,7 +67,7 @@ func TestMemoryFlagsCanBeDisabledForHostsWithoutCgroups(t *testing.T) {
 
 	for name, args := range map[string][]string{
 		"compile": runner.compileArgs(job),
-		"runtime": runner.runtimeArgs(job),
+		"runtime": runner.runtimeArgs(job, "^TestHidden$"),
 	} {
 		joined := strings.Join(args, " ")
 		if strings.Contains(joined, "--memory") || strings.Contains(joined, "--memory-swap") {
@@ -173,20 +177,74 @@ func TestPublicTestSourceIsValidGoAndQuotesValues(t *testing.T) {
 	}
 }
 
-func TestCollectTestResultsIncludesPublicValuesAndHiddenSummary(t *testing.T) {
+func TestGeneratedPublicTestCapturesActualConsoleAndPanic(t *testing.T) {
+	directory := t.TempDir()
+	files := map[string]string{
+		"go.mod": "module solution\n\ngo 1.26.0\n",
+		"solution.go": `package solution
+
+import (
+	"fmt"
+	"strings"
+)
+
+func Solve(input string) string {
+	fmt.Println("processing", input)
+	if input == "panic" {
+		panic("boom")
+	}
+	return strings.ToUpper(input)
+}
+`,
+		"public_test.go": publicTestSource([]problems.PublicTest{
+			{Input: "hello", Expected: "HELLO"},
+			{Input: "panic", Expected: "PANIC"},
+		}),
+	}
+	for name, content := range files {
+		if err := os.WriteFile(filepath.Join(directory, name), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	command := exec.Command("go", "test", "-v", ".")
+	command.Dir = directory
+	output, err := command.CombinedOutput()
+	if err == nil {
+		t.Fatal("generated tests unexpectedly passed despite the panic case")
+	}
+	report := collectPublicTestReport(string(output), []problems.PublicTest{
+		{Input: "hello", Expected: "HELLO"},
+		{Input: "panic", Expected: "PANIC"},
+	}, false)
+
+	if report.TestCases[0].Actual != "HELLO" || !report.TestCases[0].ActualAvailable {
+		t.Fatalf("successful public result = %+v", report.TestCases[0])
+	}
+	if report.TestCases[1].ActualAvailable || report.TestCases[1].Error != "panic: boom" {
+		t.Fatalf("panicking public result = %+v", report.TestCases[1])
+	}
+	if !strings.Contains(report.ConsoleOutput, "processing hello") ||
+		!strings.Contains(report.ConsoleOutput, "processing panic") {
+		t.Fatalf("console output = %q", report.ConsoleOutput)
+	}
+}
+
+func TestCollectPublicTestReportIncludesValuesAndConsole(t *testing.T) {
 	publicTests := []problems.PublicTest{
 		{Input: "level", Expected: "true"},
 		{Input: "Code", Expected: "false"},
 	}
 	output := strings.Join([]string{
-		`__CODEBATTLE_PUBLIC_RESULT__{"Index":1,"Actual":"true","Passed":true}`,
-		`__CODEBATTLE_PUBLIC_RESULT__{"Index":2,"Actual":"true","Passed":false}`,
+		`__CODEBATTLE_PUBLIC_RESULT__{"Index":1,"Actual":"true","ActualAvailable":true,"Passed":true,"Console":"checking level\n"}`,
+		`__CODEBATTLE_PUBLIC_RESULT__{"Index":2,"Actual":"true","ActualAvailable":true,"Passed":false,"Console":"checking Code\n"}`,
 		"--- PASS: TestHidden (0.00s)",
 	}, "\n")
 
-	results := collectTestResults(output, publicTests, false)
-	if len(results) != 3 {
-		t.Fatalf("got %d results, want 3", len(results))
+	report := collectPublicTestReport(output, publicTests, false)
+	results := report.TestCases
+	if len(results) != 2 {
+		t.Fatalf("got %d results, want 2", len(results))
 	}
 	if results[0].Status != "passed" || results[0].Actual != "true" {
 		t.Fatalf("first public result = %+v", results[0])
@@ -194,23 +252,50 @@ func TestCollectTestResultsIncludesPublicValuesAndHiddenSummary(t *testing.T) {
 	if results[1].Status != "failed" || results[1].Actual != "true" {
 		t.Fatalf("second public result = %+v", results[1])
 	}
-	if results[2].Kind != "hidden" || results[2].Status != "passed" {
-		t.Fatalf("hidden result = %+v", results[2])
+	if report.ConsoleOutput != "Пример 1:\nchecking level\n\n\nПример 2:\nchecking Code\n" {
+		t.Fatalf("console output = %q", report.ConsoleOutput)
 	}
 	if got := failedTestMessage(results); got != "Публичный пример 2 не пройден" {
 		t.Fatalf("message = %q", got)
 	}
 }
 
-func TestCollectTestResultsUsesSuccessfulExitWhenOutputIsTruncated(t *testing.T) {
-	results := collectTestResults("--- PASS: TestHidden", []problems.PublicTest{
+func TestCollectPublicTestReportUsesSuccessfulExitWhenMarkerIsMissing(t *testing.T) {
+	report := collectPublicTestReport("", []problems.PublicTest{
 		{Input: "hello", Expected: "world"},
 	}, true)
+	results := report.TestCases
 
 	if results[0].Status != "passed" || results[0].ActualAvailable {
 		t.Fatalf("public result = %+v", results[0])
 	}
-	if results[1].Status != "passed" {
-		t.Fatalf("hidden result = %+v", results[1])
+}
+
+func TestCollectTestReportIncludesPanicAndCapturedConsole(t *testing.T) {
+	report := collectPublicTestReport(
+		`__CODEBATTLE_PUBLIC_RESULT__{"Index":1,"Actual":"","ActualAvailable":false,"Passed":false,"Console":"before panic\n","RuntimeError":"panic: index out of range"}`,
+		[]problems.PublicTest{{Input: "input", Expected: "output"}},
+		false,
+	)
+
+	if !report.HadRuntimeError {
+		t.Fatal("runtime error was not reported")
+	}
+	if report.ConsoleOutput != "Пример 1:\nbefore panic\n" {
+		t.Fatalf("console output = %q", report.ConsoleOutput)
+	}
+	if report.TestCases[0].ActualAvailable || report.TestCases[0].Error != "panic: index out of range" {
+		t.Fatalf("public result = %+v", report.TestCases[0])
+	}
+}
+
+func TestHiddenTestResultDoesNotExposeOutput(t *testing.T) {
+	failed := hiddenTestResult("private value\n--- FAIL: TestHidden (0.00s)", false)
+	if failed.Kind != "hidden" || failed.Status != "failed" {
+		t.Fatalf("hidden result = %+v", failed)
+	}
+	passed := hiddenTestResult("", true)
+	if passed.Status != "passed" {
+		t.Fatalf("hidden result = %+v", passed)
 	}
 }
