@@ -261,7 +261,7 @@ Route guard вызывает `GET /api/v1/me`. Гость на защищенн�
 | `MatchHeader` | `Paper`, `Group`, `Badge` | Игроки, счет, раунд и состояние. |
 | `ScoreDisplay` | `Group`, `Text`, `Avatar` | Доступное текстовое представление счета. |
 | `ProblemPanel` | `Paper`, `ScrollArea`, `Accordion` | Markdown-условие, сигнатура и public tests. |
-| `CodePane` | `Paper`, `Badge`, Monaco | Заголовок владельца, редактор и каретка соперника с username. |
+| `CodePane` | `Paper`, `Badge`, Monaco | Заголовок владельца, редактор, локальный Go-autocomplete и каретка соперника с username. |
 | `JudgeResultPanel` | `Alert`, `Code`, `Accordion` | Статус и безопасная диагностическая информация. |
 | `ConnectionStatus` | `Badge`, `Loader` | Online, reconnecting, paused, disconnected. |
 | `ReadyOverlay` | `Overlay`, `Center`, `Button` | Победитель и готовность игроков. |
@@ -1493,6 +1493,8 @@ Rate limit реализуется Redis token bucket. Ответ `429` соде�
 
 - MantineProvider и сохранение light/dark выбора.
 - Синхронизация цветовой схемы Monaco.
+- Go-autocomplete показывает сигнатуру задачи, snippets и функции стандартной
+  библиотеки только в редактируемом `CodePane`.
 - Form labels, inline errors, focus и клавиатурная навигация.
 - Status badge содержит текст/aria-label, а не только цвет.
 - Invitation modal корректно истекает по server `expiresAt`.

@@ -2,8 +2,9 @@ import Editor from '@monaco-editor/react';
 import { Badge, Group, Paper, Text, useComputedColorScheme } from '@mantine/core';
 import { IconEye, IconMapPin, IconPencil } from '@tabler/icons-react';
 import * as monaco from 'monaco-editor/editor/editor.api';
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 
+import { registerGoAutocomplete } from '../goAutocomplete';
 import '../monaco';
 
 type Props = {
@@ -13,6 +14,7 @@ type Props = {
   onChange?: (value: string) => void;
   onCursorChange?: (position: CursorPosition) => void;
   remoteCursor?: CursorPosition & { label: string };
+  functionSignature?: string;
 };
 
 export type CursorPosition = {
@@ -27,11 +29,13 @@ export function CodePane({
   onChange,
   onCursorChange,
   remoteCursor,
+  functionSignature = '',
 }: Props) {
   const colorScheme = useComputedColorScheme('dark');
   const widgetID = useId();
   const [editorInstance, setEditorInstance] =
     useState<monaco.editor.IStandaloneCodeEditor | null>(null);
+  const applyingExternalValue = useRef(false);
   const remoteLine = remoteCursor?.lineNumber;
   const remoteColumn = remoteCursor?.column;
   const remoteLabel = remoteCursor?.label;
@@ -43,6 +47,23 @@ export function CodePane({
     });
     return () => listener.dispose();
   }, [editorInstance, onCursorChange]);
+
+  useEffect(() => {
+    if (!editorInstance || readOnly) return undefined;
+    const provider = registerGoAutocomplete(monaco, editorInstance, functionSignature);
+    return () => provider.dispose();
+  }, [editorInstance, functionSignature, readOnly]);
+
+  useEffect(() => {
+    const model = editorInstance?.getModel();
+    if (!model || model.getValue() === value) return;
+    applyingExternalValue.current = true;
+    try {
+      model.setValue(value);
+    } finally {
+      applyingExternalValue.current = false;
+    }
+  }, [editorInstance, value]);
 
   useEffect(() => {
     const model = editorInstance?.getModel();
@@ -101,12 +122,20 @@ export function CodePane({
         height="360px"
         language="go"
         theme={colorScheme === 'dark' ? 'vs-dark' : 'vs'}
-        value={value}
+        defaultValue={value}
         onMount={setEditorInstance}
-        onChange={(nextValue) => onChange?.(nextValue ?? '')}
+        onChange={(nextValue) => {
+          if (!applyingExternalValue.current) onChange?.(nextValue ?? '');
+        }}
         options={{
           readOnly,
           automaticLayout: true,
+          quickSuggestions: readOnly
+            ? false
+            : { other: true, comments: false, strings: false },
+          suggestOnTriggerCharacters: !readOnly,
+          snippetSuggestions: 'top',
+          tabCompletion: 'on',
           minimap: { enabled: false },
           fontFamily: 'JetBrains Mono, Consolas, monospace',
           fontSize: 14,

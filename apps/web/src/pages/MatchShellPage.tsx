@@ -286,6 +286,7 @@ export function MatchShellPage({ currentUser }: { currentUser: User }) {
                 onChange={handleSourceChange}
                 onCursorChange={handleCursorChange}
                 readOnly={ended || paused}
+                functionSignature={match.problem.function_signature}
               />
               <CodePane
                 label={`Код ${opponent.username}`}
@@ -307,6 +308,7 @@ export function MatchShellPage({ currentUser }: { currentUser: User }) {
                   onChange={handleSourceChange}
                   onCursorChange={handleCursorChange}
                   readOnly={ended || paused}
+                  functionSignature={match.problem.function_signature}
                 />
               </Tabs.Panel>
               <Tabs.Panel value="opponent" pt="md">

@@ -1,5 +1,6 @@
 import { loader } from '@monaco-editor/react';
 import * as monaco from 'monaco-editor/editor/editor.api';
+import 'monaco-editor/editor/contrib/suggest/browser/suggestController';
 import 'monaco-editor/languages/definitions/go/register';
 self.MonacoEnvironment = {
   getWorker() {
