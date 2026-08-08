@@ -22,14 +22,15 @@ const maxOutputBytes = 64 * 1024
 var jobIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
 
 type Config struct {
-	DockerBinary    string
-	Image           string
-	SourceDirectory string
-	BinaryDirectory string
-	CacheDirectory  string
-	SourceVolume    string
-	BinaryVolume    string
-	CacheVolume     string
+	DockerBinary       string
+	Image              string
+	SourceDirectory    string
+	BinaryDirectory    string
+	CacheDirectory     string
+	SourceVolume       string
+	BinaryVolume       string
+	CacheVolume        string
+	DisableMemoryLimit bool
 }
 
 type Result struct {
@@ -164,10 +165,15 @@ func (r *Runner) Run(
 		return result
 	}
 	if compileErr != nil {
+		if message, infrastructureFailure := infrastructureFailureMessage(compileOutput); infrastructureFailure {
+			result.Status = "internal_error"
+			result.Message = message
+			return result
+		}
 		result.Status = "compile_error"
 		result.Message = r.sanitizeOutput(compileOutput, job.ID)
 		if result.Message == "" {
-			result.Message = "Код не компилируется"
+			result.Message = "Код не компилируется: проверьте синтаксис, импорты и сигнатуру Solve"
 		}
 		return result
 	}
@@ -262,35 +268,45 @@ func (r *Runner) cleanup(jobID string) {
 
 func (r *Runner) compileArgs(job submissions.Job) []string {
 	memory := strconv.Itoa(max(job.MemoryLimitMB*2, 512)) + "m"
-	return []string{
+	args := []string{
 		"run", "--rm", "--network", "none", "--read-only",
-		"--memory", memory, "--memory-swap", memory, "--cpus", "2",
+	}
+	if !r.config.DisableMemoryLimit {
+		args = append(args, "--memory", memory, "--memory-swap", memory)
+	}
+	return append(args,
+		"--cpus", "2",
 		"--pids-limit", "64", "--cap-drop", "ALL",
 		"--security-opt", "no-new-privileges", "--user", "65532:65532",
 		"--tmpfs", "/tmp:rw,nosuid,nodev,size=128m",
 		"-e", "GOCACHE=/cache/go-build", "-e", "GOMAXPROCS=2", "-e", "CGO_ENABLED=0",
-		"-v", r.config.SourceVolume + ":/src:ro",
-		"-v", r.config.BinaryVolume + ":/out",
-		"-v", r.config.CacheVolume + ":/cache",
-		"-w", "/src/" + job.ID,
+		"-v", r.config.SourceVolume+":/src:ro",
+		"-v", r.config.BinaryVolume+":/out",
+		"-v", r.config.CacheVolume+":/cache",
+		"-w", "/src/"+job.ID,
 		r.config.Image,
-		"go", "test", "-c", "-trimpath", "-o", "/out/" + job.ID + "/tests", ".",
-	}
+		"go", "test", "-c", "-trimpath", "-o", "/out/"+job.ID+"/tests", ".",
+	)
 }
 
 func (r *Runner) runtimeArgs(job submissions.Job) []string {
 	memory := strconv.Itoa(max(job.MemoryLimitMB, 32)) + "m"
-	return []string{
+	args := []string{
 		"run", "--rm", "--network", "none", "--read-only",
-		"--memory", memory, "--memory-swap", memory, "--cpus", "1",
+	}
+	if !r.config.DisableMemoryLimit {
+		args = append(args, "--memory", memory, "--memory-swap", memory)
+	}
+	return append(args,
+		"--cpus", "1",
 		"--pids-limit", "64", "--cap-drop", "ALL",
 		"--security-opt", "no-new-privileges", "--user", "65532:65532",
 		"--tmpfs", "/tmp:rw,nosuid,nodev,size=16m",
-		"-v", r.config.BinaryVolume + ":/out:ro",
-		"-w", "/out/" + job.ID,
+		"-v", r.config.BinaryVolume+":/out:ro",
+		"-w", "/out/"+job.ID,
 		r.config.Image,
-		"./tests", "-test.v", "-test.timeout=" + solutionTimeLimit(job).String(),
-	}
+		"./tests", "-test.v", "-test.timeout="+solutionTimeLimit(job).String(),
+	)
 }
 
 func solutionTimeLimit(job submissions.Job) time.Duration {
@@ -323,11 +339,42 @@ func (r *Runner) sanitizeOutput(output, jobID string) string {
 		"/out/"+jobID, "",
 		"hidden_test.go", "tests.go",
 	)
-	cleaned := strings.TrimSpace(replacer.Replace(output))
+	cleanedLines := make([]string, 0)
+	for _, line := range strings.Split(replacer.Replace(output), "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || trimmed == "# solution [solution.test]" ||
+			strings.Contains(trimmed, "kernel does not support memory limit capabilities") {
+			continue
+		}
+		cleanedLines = append(cleanedLines, line)
+	}
+	cleaned := strings.TrimSpace(strings.Join(cleanedLines, "\n"))
 	if len(cleaned) > maxOutputBytes {
 		cleaned = cleaned[:maxOutputBytes]
 	}
 	return cleaned
+}
+
+func DetectMemoryLimitSupport(ctx context.Context, dockerBinary string) (bool, error) {
+	output, err := exec.CommandContext(ctx, dockerBinary, "info", "--format", "{{.MemoryLimit}}").Output()
+	if err != nil {
+		return false, err
+	}
+	return strings.EqualFold(strings.TrimSpace(string(output)), "true"), nil
+}
+
+func infrastructureFailureMessage(output string) (string, bool) {
+	lower := strings.ToLower(output)
+	switch {
+	case strings.Contains(lower, "no space left on device"):
+		return "Judge временно недоступен: на сервере закончилось место", true
+	case strings.Contains(lower, "cannot connect to the docker daemon"),
+		strings.Contains(lower, "error during connect"),
+		strings.Contains(lower, "error response from daemon"):
+		return "Judge временно недоступен: Docker не смог запустить проверку", true
+	default:
+		return "", false
+	}
 }
 
 type limitedBuffer struct {

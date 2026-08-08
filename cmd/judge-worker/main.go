@@ -40,15 +40,26 @@ func main() {
 	}
 
 	repository := submissions.NewRepository(pool)
+	disableMemoryLimit := false
+	detectCtx, cancelDetect := context.WithTimeout(ctx, 5*time.Second)
+	memoryLimitSupported, detectErr := judge.DetectMemoryLimitSupport(detectCtx, cfg.DockerBinary)
+	cancelDetect()
+	if detectErr != nil {
+		logger.Warn("detect docker memory limit support", "error", detectErr)
+	} else if !memoryLimitSupported {
+		disableMemoryLimit = true
+		logger.Warn("docker memory limits are unavailable; continuing with CPU and PID limits")
+	}
 	runner := judge.NewRunner(judge.Config{
-		DockerBinary:    cfg.DockerBinary,
-		Image:           cfg.JudgeImage,
-		SourceDirectory: cfg.SourceDirectory,
-		BinaryDirectory: cfg.BinaryDirectory,
-		CacheDirectory:  cfg.CacheDirectory,
-		SourceVolume:    cfg.SourceVolume,
-		BinaryVolume:    cfg.BinaryVolume,
-		CacheVolume:     cfg.CacheVolume,
+		DockerBinary:       cfg.DockerBinary,
+		Image:              cfg.JudgeImage,
+		SourceDirectory:    cfg.SourceDirectory,
+		BinaryDirectory:    cfg.BinaryDirectory,
+		CacheDirectory:     cfg.CacheDirectory,
+		SourceVolume:       cfg.SourceVolume,
+		BinaryVolume:       cfg.BinaryVolume,
+		CacheVolume:        cfg.CacheVolume,
+		DisableMemoryLimit: disableMemoryLimit,
 	})
 
 	server := healthServer(cfg.HealthAddress, pool, cfg.DockerBinary)

@@ -43,6 +43,13 @@ PostgreSQL использует named volume `postgres-data`. В Dokploy Volume 
 
 `judge-worker` должен сохранить единственный bind mount Docker socket `/var/run/docker.sock`; он нужен для запуска sandbox-контейнеров. Не добавляйте этот mount другим сервисам.
 
+Worker при старте проверяет `docker info`. Если хост не поддерживает memory cgroup,
+он не передает неподдерживаемые `--memory`/`--memory-swap`, поэтому Docker не
+добавляет предупреждение к результату компиляции. CPU, PID, network и timeout
+ограничения продолжают работать, но жесткой защиты памяти на таком хосте нет.
+Для публичного запуска используйте VM с cgroup v2 и убедитесь, что команда
+`docker info --format '{{.MemoryLimit}}'` возвращает `true`.
+
 ## Проверка
 
 У `postgres`, `api`, `judge-worker` и `gateway` должен быть статус healthy. Одноразовый `problem-seed` должен завершиться с кодом 0.

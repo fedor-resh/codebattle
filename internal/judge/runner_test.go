@@ -51,6 +51,32 @@ func TestCompileAndRuntimeContainersAreIsolated(t *testing.T) {
 	}
 }
 
+func TestMemoryFlagsCanBeDisabledForHostsWithoutCgroups(t *testing.T) {
+	runner := NewRunner(Config{
+		Image:              "judge-image",
+		SourceVolume:       "source-volume",
+		BinaryVolume:       "binary-volume",
+		CacheVolume:        "cache-volume",
+		DisableMemoryLimit: true,
+	})
+	job := submissions.Job{Submission: submissions.Submission{ID: "safe-job"}, MemoryLimitMB: 256}
+
+	for name, args := range map[string][]string{
+		"compile": runner.compileArgs(job),
+		"runtime": runner.runtimeArgs(job),
+	} {
+		joined := strings.Join(args, " ")
+		if strings.Contains(joined, "--memory") || strings.Contains(joined, "--memory-swap") {
+			t.Fatalf("%s args contain unsupported memory flags: %s", name, joined)
+		}
+		for _, required := range []string{"--cpus", "--pids-limit 64", "--network none"} {
+			if !strings.Contains(joined, required) {
+				t.Fatalf("%s args lost %q: %s", name, required, joined)
+			}
+		}
+	}
+}
+
 func TestCleanStaleArtifactsPreservesCache(t *testing.T) {
 	root := t.TempDir()
 	sourceDirectory := filepath.Join(root, "source")
@@ -109,6 +135,29 @@ func TestSanitizeOutputHidesInternalPathsAndHiddenTestName(t *testing.T) {
 	)
 	if strings.Contains(got, "/judge-source") || strings.Contains(got, "hidden_test.go") {
 		t.Fatalf("sanitized output leaks internals: %q", got)
+	}
+}
+
+func TestSanitizeOutputRemovesDockerWarningAndPackageBanner(t *testing.T) {
+	runner := NewRunner(Config{})
+	got := runner.sanitizeOutput(strings.Join([]string{
+		"WARNING: Your kernel does not support memory limit capabilities or the cgroup is not mounted. Limitation discarded.",
+		"# solution [solution.test]",
+		"./solution.go:7:2: undefined: result",
+	}, "\n"), "safe-job")
+
+	if got != "./solution.go:7:2: undefined: result" {
+		t.Fatalf("sanitized output = %q", got)
+	}
+}
+
+func TestInfrastructureFailureMessage(t *testing.T) {
+	message, ok := infrastructureFailureMessage("link: mapping output file failed: no space left on device")
+	if !ok || !strings.Contains(message, "закончилось место") {
+		t.Fatalf("message=%q ok=%v", message, ok)
+	}
+	if _, ok := infrastructureFailureMessage("./solution.go:2: undefined: value"); ok {
+		t.Fatal("user compile error was classified as infrastructure failure")
 	}
 }
 

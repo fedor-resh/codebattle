@@ -85,7 +85,7 @@ docker compose -f docker-compose.yml -f docker-compose.local.yml config --quiet
 
 ## Judge и границы безопасности
 
-Только judge-worker получает Docker socket. API не видит hidden tests и не имеет доступа к Docker daemon. Компиляция и тесты выполняются в разных контейнерах; runtime получает только test binary. Контейнеры запускаются без сети и Linux capabilities, от non-root пользователя, с read-only rootfs, `no-new-privileges`, PID/CPU/memory/output limits. Внутренние пути и содержимое hidden tests не возвращаются клиенту.
+Только judge-worker получает Docker socket. API не видит hidden tests и не имеет доступа к Docker daemon. Компиляция и тесты выполняются в разных контейнерах; runtime получает только test binary. Контейнеры запускаются без сети и Linux capabilities, от non-root пользователя, с read-only rootfs, `no-new-privileges`, PID/CPU/output limits и memory limit на хостах с доступным memory cgroup. Внутренние пути и содержимое hidden tests не возвращаются клиенту.
 
 Это практичная изоляция для MVP на отдельной Linux VM, но Docker socket даёт worker высокий уровень доверия. Перед многоарендным публичным запуском worker следует вынести на отдельный хост или заменить специализированной sandbox-средой.
 
