@@ -45,7 +45,16 @@ type submission struct {
 	Status    string    `json:"status"`
 	CreatedAt time.Time `json:"created_at"`
 	Result    struct {
-		Message string `json:"message"`
+		Message     string `json:"message"`
+		PassedTests int    `json:"passed_tests"`
+		TotalTests  int    `json:"total_tests"`
+		TestCases   []struct {
+			Kind     string `json:"kind"`
+			Status   string `json:"status"`
+			Input    string `json:"input"`
+			Expected string `json:"expected"`
+			Actual   string `json:"actual"`
+		} `json:"test_cases"`
 	} `json:"result"`
 }
 
@@ -107,7 +116,11 @@ func main() {
 
 	wrong := submitAndWait(aliceClient, game.ID, string(wrongSource))
 	check(wrong.Status == "wrong_answer", fmt.Sprintf("wrong solution status %s: %s", wrong.Status, wrong.Result.Message))
-	check(wrong.Result.Message == "Скрытый тест не пройден", "hidden-test feedback leaked implementation details")
+	check(wrong.Result.Message == "Публичный пример 1 не пройден", "public-test feedback is not specific")
+	check(len(wrong.Result.TestCases) >= 3, "public and hidden test results are missing")
+	check(wrong.Result.TestCases[0].Kind == "public" && wrong.Result.TestCases[0].Status == "failed", "public test result mismatch")
+	lastWrongTest := wrong.Result.TestCases[len(wrong.Result.TestCases)-1]
+	check(lastWrongTest.Kind == "hidden" && lastWrongTest.Input == "" && lastWrongTest.Expected == "" && lastWrongTest.Actual == "", "hidden-test data leaked")
 
 	// A long cold compilation can pause the room because the second client is idle.
 	// Refresh both sessions before the accepted submission to exercise reconnect as well.
@@ -120,6 +133,7 @@ func main() {
 
 	judged := submitAndWait(aliceClient, game.ID, string(source))
 	check(judged.Status == "accepted", fmt.Sprintf("judge status %s: %s", judged.Status, judged.Result.Message))
+	check(judged.Result.TotalTests > 0 && judged.Result.PassedTests == judged.Result.TotalTests, "accepted solution does not report all tests as passed")
 
 	bobClient.do(http.MethodGet, "/matches/"+game.ID, nil, &matchResponse)
 	finished := matchResponse.Match

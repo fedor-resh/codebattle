@@ -33,9 +33,23 @@ type Config struct {
 }
 
 type Result struct {
-	Status     string `json:"status"`
-	Message    string `json:"message"`
-	DurationMS int64  `json:"duration_ms"`
+	Status      string           `json:"status"`
+	Message     string           `json:"message"`
+	DurationMS  int64            `json:"duration_ms"`
+	PassedTests int              `json:"passed_tests,omitempty"`
+	TotalTests  int              `json:"total_tests,omitempty"`
+	TestCases   []TestCaseResult `json:"test_cases,omitempty"`
+}
+
+type TestCaseResult struct {
+	Kind            string `json:"kind"`
+	Index           int    `json:"index,omitempty"`
+	Status          string `json:"status"`
+	Input           string `json:"input,omitempty"`
+	Expected        string `json:"expected,omitempty"`
+	Actual          string `json:"actual,omitempty"`
+	ActualAvailable bool   `json:"actual_available,omitempty"`
+	ActualTruncated bool   `json:"actual_truncated,omitempty"`
 }
 
 type Runner struct {
@@ -79,6 +93,9 @@ func (r *Runner) WarmCache(ctx context.Context) error {
 	job := submissions.Job{
 		Submission: submissions.Submission{ID: "warm-cache"},
 		SourceCode: "package solution\n\nfunc Solve(input string) string { return input }\n",
+		PublicTests: []problems.PublicTest{
+			{Input: "ready", Expected: "ready"},
+		},
 		HiddenTestSource: `package solution
 
 import "testing"
@@ -158,18 +175,25 @@ func (r *Runner) Run(
 		return result
 	}
 
-	testLimit := time.Duration(job.TimeLimitMS) * time.Millisecond
-	if testLimit <= 0 {
-		testLimit = 2 * time.Second
-	}
-	testCtx, cancelTest := context.WithTimeout(ctx, testLimit)
+	testLimit := solutionTimeLimit(job)
+	// The solution timeout is enforced by the Go test binary. The outer limit
+	// additionally covers Docker startup and shutdown, which can be noticeably
+	// slower on a cold host and must not count as the player's execution time.
+	testCtx, cancelTest := context.WithTimeout(ctx, testLimit+5*time.Second)
 	testOutput, testErr, testTimedOut := r.dockerCommand(
 		testCtx,
 		"codebattle-run-"+job.ID,
 		r.runtimeArgs(job),
 	)
 	cancelTest()
-	if testTimedOut {
+	result.TestCases = collectTestResults(testOutput, job.PublicTests, testErr == nil)
+	result.TotalTests = len(result.TestCases)
+	for _, testCase := range result.TestCases {
+		if testCase.Status == "passed" {
+			result.PassedTests++
+		}
+	}
+	if testTimedOut || strings.Contains(testOutput, "panic: test timed out") {
 		result.Status = "time_limit"
 		result.Message = "Превышен лимит времени"
 		return result
@@ -180,7 +204,7 @@ func (r *Runner) Run(
 			result.Message = "Ошибка выполнения"
 		} else {
 			result.Status = "wrong_answer"
-			result.Message = "Скрытый тест не пройден"
+			result.Message = failedTestMessage(result.TestCases)
 		}
 		return result
 	}
@@ -216,6 +240,9 @@ func (r *Runner) prepare(job submissions.Job) error {
 		"go.mod":         "module solution\n\ngo 1.26.0\n",
 		"solution.go":    job.SourceCode,
 		"hidden_test.go": job.HiddenTestSource,
+	}
+	if len(job.PublicTests) > 0 {
+		files["public_test.go"] = publicTestSource(job.PublicTests)
 	}
 	for name, content := range files {
 		if err := os.WriteFile(filepath.Join(sourceDirectory, name), []byte(content), 0o644); err != nil {
@@ -262,8 +289,16 @@ func (r *Runner) runtimeArgs(job submissions.Job) []string {
 		"-v", r.config.BinaryVolume + ":/out:ro",
 		"-w", "/out/" + job.ID,
 		r.config.Image,
-		"./tests", "-test.v",
+		"./tests", "-test.v", "-test.timeout=" + solutionTimeLimit(job).String(),
 	}
+}
+
+func solutionTimeLimit(job submissions.Job) time.Duration {
+	limit := time.Duration(job.TimeLimitMS) * time.Millisecond
+	if limit <= 0 {
+		return 2 * time.Second
+	}
+	return limit
 }
 
 func (r *Runner) dockerCommand(ctx context.Context, name string, args []string) (string, error, bool) {

@@ -1,11 +1,13 @@
 package judge
 
 import (
+	"go/format"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"codebattle.local/codebattle/internal/problems"
 	"codebattle.local/codebattle/internal/submissions"
 )
 
@@ -43,6 +45,9 @@ func TestCompileAndRuntimeContainersAreIsolated(t *testing.T) {
 	}
 	if !strings.Contains(runtime, "binary-volume:/out:ro") {
 		t.Fatalf("runtime binary volume is not read-only: %s", runtime)
+	}
+	if !strings.Contains(runtime, "-test.timeout=2s") {
+		t.Fatalf("runtime binary does not enforce the solution timeout: %s", runtime)
 	}
 }
 
@@ -104,5 +109,59 @@ func TestSanitizeOutputHidesInternalPathsAndHiddenTestName(t *testing.T) {
 	)
 	if strings.Contains(got, "/judge-source") || strings.Contains(got, "hidden_test.go") {
 		t.Fatalf("sanitized output leaks internals: %q", got)
+	}
+}
+
+func TestPublicTestSourceIsValidGoAndQuotesValues(t *testing.T) {
+	source := publicTestSource([]problems.PublicTest{
+		{Input: "line one\n\"quoted\"", Expected: "ответ"},
+	})
+	if _, err := format.Source([]byte(source)); err != nil {
+		t.Fatalf("generated public test is not valid Go: %v\n%s", err, source)
+	}
+	if !strings.Contains(source, publicResultMarker) {
+		t.Fatal("generated public test does not contain the result marker")
+	}
+}
+
+func TestCollectTestResultsIncludesPublicValuesAndHiddenSummary(t *testing.T) {
+	publicTests := []problems.PublicTest{
+		{Input: "level", Expected: "true"},
+		{Input: "Code", Expected: "false"},
+	}
+	output := strings.Join([]string{
+		`__CODEBATTLE_PUBLIC_RESULT__{"Index":1,"Actual":"true","Passed":true}`,
+		`__CODEBATTLE_PUBLIC_RESULT__{"Index":2,"Actual":"true","Passed":false}`,
+		"--- PASS: TestHidden (0.00s)",
+	}, "\n")
+
+	results := collectTestResults(output, publicTests, false)
+	if len(results) != 3 {
+		t.Fatalf("got %d results, want 3", len(results))
+	}
+	if results[0].Status != "passed" || results[0].Actual != "true" {
+		t.Fatalf("first public result = %+v", results[0])
+	}
+	if results[1].Status != "failed" || results[1].Actual != "true" {
+		t.Fatalf("second public result = %+v", results[1])
+	}
+	if results[2].Kind != "hidden" || results[2].Status != "passed" {
+		t.Fatalf("hidden result = %+v", results[2])
+	}
+	if got := failedTestMessage(results); got != "Публичный пример 2 не пройден" {
+		t.Fatalf("message = %q", got)
+	}
+}
+
+func TestCollectTestResultsUsesSuccessfulExitWhenOutputIsTruncated(t *testing.T) {
+	results := collectTestResults("--- PASS: TestHidden", []problems.PublicTest{
+		{Input: "hello", Expected: "world"},
+	}, true)
+
+	if results[0].Status != "passed" || results[0].ActualAvailable {
+		t.Fatalf("public result = %+v", results[0])
+	}
+	if results[1].Status != "passed" {
+		t.Fatalf("hidden result = %+v", results[1])
 	}
 }

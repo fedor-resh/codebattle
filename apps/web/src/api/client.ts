@@ -68,12 +68,29 @@ export type SubmissionStatus =
   | 'memory_limit'
   | 'internal_error';
 
+export type SubmissionTestCase = {
+  kind: 'public' | 'hidden';
+  index?: number;
+  status: 'passed' | 'failed' | 'not_run';
+  input?: string;
+  expected?: string;
+  actual?: string;
+  actual_available?: boolean;
+  actual_truncated?: boolean;
+};
+
 export type Submission = {
   id: string;
   match_id: string;
   user_id: string;
   status: SubmissionStatus;
-  result?: { message?: string; duration_ms?: number };
+  result?: {
+    message?: string;
+    duration_ms?: number;
+    passed_tests?: number;
+    total_tests?: number;
+    test_cases?: SubmissionTestCase[];
+  };
   created_at: string;
 };
 

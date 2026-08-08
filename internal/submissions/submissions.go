@@ -36,6 +36,7 @@ type Job struct {
 	Submission
 	ProblemVersionID string
 	SourceCode       string
+	PublicTests      []problems.PublicTest
 	HiddenTestSource string
 	TimeLimitMS      int
 	MemoryLimitMB    int
@@ -151,9 +152,11 @@ func (r *Repository) Claim(ctx context.Context) (Job, error) {
 	defer func() { _ = tx.Rollback(ctx) }()
 
 	var job Job
+	var publicTests string
 	err = tx.QueryRow(ctx, `
 		SELECT s.id, s.match_id, s.user_id, s.status, s.created_at,
-			s.problem_version_id, s.source_code, bundle.hidden_test_source,
+			s.problem_version_id, s.source_code, problem.public_tests::text,
+			bundle.hidden_test_source,
 			problem.time_limit_ms, problem.memory_limit_mb
 		FROM submissions s
 		JOIN problem_versions problem ON problem.id = s.problem_version_id
@@ -164,7 +167,7 @@ func (r *Repository) Claim(ctx context.Context) (Job, error) {
 		LIMIT 1
 	`).Scan(
 		&job.ID, &job.MatchID, &job.UserID, &job.Status, &job.CreatedAt,
-		&job.ProblemVersionID, &job.SourceCode, &job.HiddenTestSource,
+		&job.ProblemVersionID, &job.SourceCode, &publicTests, &job.HiddenTestSource,
 		&job.TimeLimitMS, &job.MemoryLimitMB,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -172,6 +175,9 @@ func (r *Repository) Claim(ctx context.Context) (Job, error) {
 	}
 	if err != nil {
 		return Job{}, err
+	}
+	if err := json.Unmarshal([]byte(publicTests), &job.PublicTests); err != nil {
+		return Job{}, fmt.Errorf("decode public tests for submission %s: %w", job.ID, err)
 	}
 	if _, err := tx.Exec(ctx, `
 		UPDATE submissions SET status = 'compiling', claimed_at = now() WHERE id = $1
