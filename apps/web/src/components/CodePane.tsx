@@ -100,7 +100,7 @@ export function CodePane({
   }, [editorInstance, remoteLine, remoteColumn, remoteLabel, value, widgetID]);
 
   return (
-    <Paper withBorder radius="md" style={{ overflow: 'hidden' }}>
+    <Paper withBorder radius="md" className="code-pane">
       <Group justify="space-between" px="md" py="sm">
         <Text fw={600}>{label}</Text>
         <Group gap="xs">
@@ -118,33 +118,35 @@ export function CodePane({
           </Badge>
         </Group>
       </Group>
-      <Editor
-        height="360px"
-        language="go"
-        theme={colorScheme === 'dark' ? 'vs-dark' : 'vs'}
-        defaultValue={value}
-        onMount={setEditorInstance}
-        onChange={(nextValue) => {
-          if (!applyingExternalValue.current) onChange?.(nextValue ?? '');
-        }}
-        options={{
-          readOnly,
-          automaticLayout: true,
-          quickSuggestions: readOnly
-            ? false
-            : { other: true, comments: false, strings: false },
-          suggestOnTriggerCharacters: !readOnly,
-          snippetSuggestions: 'top',
-          tabCompletion: 'on',
-          minimap: { enabled: false },
-          fontFamily: 'JetBrains Mono, Consolas, monospace',
-          fontSize: 14,
-          lineNumbersMinChars: 3,
-          padding: { top: 14, bottom: 14 },
-          scrollBeyondLastLine: false,
-          tabSize: 4,
-        }}
-      />
+      <div className="code-pane__editor">
+        <Editor
+          height="100%"
+          language="go"
+          theme={colorScheme === 'dark' ? 'vs-dark' : 'vs'}
+          defaultValue={value}
+          onMount={setEditorInstance}
+          onChange={(nextValue) => {
+            if (!applyingExternalValue.current) onChange?.(nextValue ?? '');
+          }}
+          options={{
+            readOnly,
+            automaticLayout: true,
+            quickSuggestions: readOnly
+              ? false
+              : { other: true, comments: false, strings: false },
+            suggestOnTriggerCharacters: !readOnly,
+            snippetSuggestions: 'top',
+            tabCompletion: 'on',
+            minimap: { enabled: false },
+            fontFamily: 'JetBrains Mono, Consolas, monospace',
+            fontSize: 14,
+            lineNumbersMinChars: 3,
+            padding: { top: 14, bottom: 14 },
+            scrollBeyondLastLine: false,
+            tabSize: 4,
+          }}
+        />
+      </div>
     </Paper>
   );
 }
