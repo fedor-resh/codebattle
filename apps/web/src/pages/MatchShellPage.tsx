@@ -323,14 +323,6 @@ export function MatchShellPage({ currentUser }: { currentUser: User }) {
 
             <Paper withBorder p="md" radius="md">
               <Stack>
-                <JudgeResultPanel submission={submissionQuery.data} />
-                {submitMutation.error && (
-                  <Alert color="red">
-                    {submitMutation.error instanceof ApiError
-                      ? submitMutation.error.message
-                      : 'Не удалось отправить решение'}
-                  </Alert>
-                )}
                 <Button
                   disabled={ended || paused}
                   loading={submitMutation.isPending}
@@ -340,6 +332,14 @@ export function MatchShellPage({ currentUser }: { currentUser: User }) {
                 >
                   {waitingReady ? 'Проверить вне зачёта' : 'Отправить решение'}
                 </Button>
+                <JudgeResultPanel submission={submissionQuery.data} />
+                {submitMutation.error && (
+                  <Alert color="red">
+                    {submitMutation.error instanceof ApiError
+                      ? submitMutation.error.message
+                      : 'Не удалось отправить решение'}
+                  </Alert>
+                )}
               </Stack>
             </Paper>
           </div>
