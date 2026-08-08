@@ -1,0 +1,10 @@
+[
+  {
+    "arguments": [[1, 2, 3, 1]],
+    "expected": true
+  },
+  {
+    "arguments": [[1, 2, 3, 4]],
+    "expected": false
+  }
+]

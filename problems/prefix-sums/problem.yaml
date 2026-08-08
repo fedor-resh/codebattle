@@ -1,0 +1,8 @@
+slug: prefix-sums
+title: "Префиксные суммы"
+difficulty: easy
+function: Solve
+signature: "func Solve(nums []int) []int"
+version: 1
+time_limit_ms: 2000
+memory_limit_mb: 256

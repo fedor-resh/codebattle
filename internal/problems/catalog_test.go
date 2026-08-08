@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func TestCatalogContainsTwentyValidProblems(t *testing.T) {
+func TestCatalogContainsTwentyFiveValidProblems(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
 
@@ -15,8 +15,8 @@ func TestCatalogContainsTwentyValidProblems(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(catalog) != 20 {
-		t.Fatalf("catalog size = %d, want 20", len(catalog))
+	if len(catalog) != 25 {
+		t.Fatalf("catalog size = %d, want 25", len(catalog))
 	}
 	seen := map[string]bool{}
 	for _, problem := range catalog {

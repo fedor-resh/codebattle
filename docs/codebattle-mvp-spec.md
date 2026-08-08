@@ -1181,6 +1181,11 @@ Compile workspace имеет фиксированную структуру:
 | 18 | `two-sum` | `func Solve(nums []int, target int) []int` | Вернуть индексы подходящей пары. |
 | 19 | `unique-words` | `func Solve(words []string) []string` | Вернуть готовый список уникальных слов. |
 | 20 | `word-frequency` | `func Solve(words []string) map[string]int` | Вернуть таблицу частот без сериализации. |
+| 21 | `contains-duplicate` | `func Solve(nums []int) bool` | Проверить наличие повторяющихся чисел. |
+| 22 | `is-prime` | `func Solve(n int) bool` | Проверить, является ли число простым. |
+| 23 | `prefix-sums` | `func Solve(nums []int) []int` | Построить массив префиксных сумм. |
+| 24 | `rune-frequency` | `func Solve(text string) map[string]int` | Посчитать Unicode-символы строки. |
+| 25 | `sorted-intersection` | `func Solve(left, right []int) []int` | Найти пересечение с учетом повторов. |
 
 Для каждой задачи в MVP требуется не менее двух public и трех hidden cases,
 включая граничные значения. Hidden tests не должны зависеть от случайности,
@@ -1512,7 +1517,7 @@ Playwright запускает два независимых browser context:
 7. Один ready не запускает раунд; второй ready запускает.
 8. Reconnect в пределах 60 секунд восстанавливает код.
 9. Истечение reconnect deadline завершает матч.
-10. После двадцатой задачи создается новый shuffled cycle.
+10. После исчерпания всех 25 задач создается новый shuffled cycle.
 
 ### 16.6. Нагрузочные тесты
 
@@ -1570,7 +1575,7 @@ MVP готов, если одновременно выполнены услов�
 ### Этап 4. Problems и judge
 
 - Реализовать problem file schema и seed command.
-- Подготовить 20 каталогов задач и тесты.
+- Подготовить 25 каталогов задач и тесты.
 - Реализовать Redis Stream worker, AST validation и двухфазный sandbox.
 - Добавить feedback sanitizer и security suite.
 

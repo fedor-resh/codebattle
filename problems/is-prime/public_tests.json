@@ -1,0 +1,10 @@
+[
+  {
+    "arguments": [2],
+    "expected": true
+  },
+  {
+    "arguments": [15],
+    "expected": false
+  }
+]

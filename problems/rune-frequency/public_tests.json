@@ -1,0 +1,10 @@
+[
+  {
+    "arguments": ["aba"],
+    "expected": {"a": 2, "b": 1}
+  },
+  {
+    "arguments": ["Go界G"],
+    "expected": {"G": 2, "o": 1, "界": 1}
+  }
+]

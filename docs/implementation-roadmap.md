@@ -34,7 +34,7 @@ MVP реализован последовательными продуктовы
 ## Этап 4. Задачи и judge — завершён
 
 - [x] YAML-схема, строгий loader, AST-проверка и content hash.
-- [x] 20 задач со starter, statement, public/hidden tests и reference solution.
+- [x] 25 задач со starter, statement, public/hidden tests и reference solution.
 - [x] Идемпотентный seed неизменяемых problem versions.
 - [x] Очередь отправок в PostgreSQL с `FOR UPDATE SKIP LOCKED`.
 - [x] Лимит одной отправки в две секунды и до трёх незавершённых.

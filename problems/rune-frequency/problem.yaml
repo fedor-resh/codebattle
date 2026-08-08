@@ -1,0 +1,8 @@
+slug: rune-frequency
+title: "Частоты символов"
+difficulty: medium
+function: Solve
+signature: "func Solve(text string) map[string]int"
+version: 1
+time_limit_ms: 2000
+memory_limit_mb: 256

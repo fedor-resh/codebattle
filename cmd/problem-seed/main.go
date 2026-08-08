@@ -28,8 +28,8 @@ func main() {
 		logger.Error("validate problem catalog", "error", err)
 		os.Exit(1)
 	}
-	if len(catalog) != 20 {
-		logger.Error("problem catalog must contain exactly 20 tasks", "count", len(catalog))
+	if len(catalog) != 25 {
+		logger.Error("problem catalog must contain exactly 25 tasks", "count", len(catalog))
 		os.Exit(1)
 	}
 	if *validateOnly {
