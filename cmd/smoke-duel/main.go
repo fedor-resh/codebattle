@@ -143,6 +143,29 @@ func main() {
 	finished := matchResponse.Match
 	check(finished.State == "waiting_ready" && finished.RoundWinnerID == alice.ID, "round winner mismatch")
 	check(finished.PlayerOneScore == 1 && finished.PlayerTwoScore == 0, "score was not incremented exactly once")
+	aliceClient.do(http.MethodPut, "/matches/"+game.ID+"/code", map[string]any{
+		"source_code":   string(wrongSource),
+		"revision":      2,
+		"cursor_line":   5,
+		"cursor_column": 3,
+	}, nil)
+	bobClient.do(http.MethodGet, "/matches/"+game.ID, nil, &matchResponse)
+	postWinCodeVisible := false
+	for _, code := range matchResponse.Match.CodeSnapshots {
+		postWinCodeVisible = postWinCodeVisible || (code.UserID == alice.ID && code.Revision == 2 && code.CursorLine == 5 && code.CursorColumn == 3)
+	}
+	check(postWinCodeVisible, "post-win editor snapshot was not synchronized")
+
+	// Players may keep checking solutions after the winner has been fixed. Even
+	// another accepted result must not award a second point or change the winner.
+	time.Sleep(2100 * time.Millisecond)
+	practice := submitAndWait(aliceClient, game.ID, string(source))
+	check(practice.Status == "accepted", fmt.Sprintf("post-win judge status %s: %s", practice.Status, practice.Result.Message))
+	bobClient.do(http.MethodGet, "/matches/"+game.ID, nil, &matchResponse)
+	afterPractice := matchResponse.Match
+	check(afterPractice.State == "waiting_ready", "post-win submission changed match state")
+	check(afterPractice.RoundWinnerID == alice.ID, "post-win submission changed round winner")
+	check(afterPractice.PlayerOneScore == 1 && afterPractice.PlayerTwoScore == 0, "post-win submission changed score")
 
 	aliceClient.do(http.MethodPost, "/matches/"+game.ID+"/ready", nil, nil)
 	bobClient.do(http.MethodPost, "/matches/"+game.ID+"/ready", nil, &matchResponse)
@@ -152,15 +175,16 @@ func main() {
 	aliceClient.do(http.MethodPost, "/matches/"+game.ID+"/leave", nil, nil)
 
 	output, _ := json.MarshalIndent(map[string]any{
-		"alice":         alice.Username,
-		"bob":           bob.Username,
-		"match_id":      game.ID,
-		"first_problem": game.Problem.Slug,
-		"wrong_status":  wrong.Status,
-		"judge_status":  judged.Status,
-		"score":         fmt.Sprintf("%d:%d", finished.PlayerOneScore, finished.PlayerTwoScore),
-		"next_problem":  next.Problem.Slug,
-		"round":         next.RoundNumber,
+		"alice":           alice.Username,
+		"bob":             bob.Username,
+		"match_id":        game.ID,
+		"first_problem":   game.Problem.Slug,
+		"wrong_status":    wrong.Status,
+		"judge_status":    judged.Status,
+		"practice_status": practice.Status,
+		"score":           fmt.Sprintf("%d:%d", finished.PlayerOneScore, finished.PlayerTwoScore),
+		"next_problem":    next.Problem.Slug,
+		"round":           next.RoundNumber,
 	}, "", "  ")
 	fmt.Println(string(output))
 }

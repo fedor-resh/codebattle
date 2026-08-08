@@ -363,7 +363,7 @@ func (r *PostgresRepository) UpdateCode(
 		)
 		SELECT m.id, $2, m.problem_version_id, $3, $4, $5, $6, $7
 		FROM matches m
-		WHERE m.id = $1 AND m.state = 'active'
+		WHERE m.id = $1 AND m.state IN ('active', 'waiting_ready')
 			AND (m.player_one_id = $2 OR m.player_two_id = $2)
 		ON CONFLICT (match_id, user_id) DO UPDATE SET
 			problem_version_id = EXCLUDED.problem_version_id,
@@ -379,16 +379,16 @@ func (r *PostgresRepository) UpdateCode(
 		return err
 	}
 	if result.RowsAffected() == 0 {
-		var active bool
+		var editable bool
 		if err := r.pool.QueryRow(ctx, `
 			SELECT EXISTS (
-				SELECT 1 FROM matches WHERE id = $1 AND state = 'active'
+				SELECT 1 FROM matches WHERE id = $1 AND state IN ('active', 'waiting_ready')
 					AND (player_one_id = $2 OR player_two_id = $2)
 			)
-		`, matchID, userID).Scan(&active); err != nil {
+		`, matchID, userID).Scan(&editable); err != nil {
 			return err
 		}
-		if active {
+		if editable {
 			return ErrStaleRevision
 		}
 		return ErrRoundNotActive

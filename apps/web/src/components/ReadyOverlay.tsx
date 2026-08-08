@@ -38,6 +38,10 @@ export function ReadyOverlay({
             </Accordion.Item>
           </Accordion>
         )}
+        <Alert color="indigo" variant="light">
+          Можно продолжить редактировать и проверять решения вне зачёта. Результат раунда и счёт
+          уже зафиксированы.
+        </Alert>
         <Alert color={opponentReady ? 'green' : 'blue'}>
           {opponentReady ? 'Соперник готов к следующей задаче.' : 'Ожидаем готовность соперника.'}
         </Alert>

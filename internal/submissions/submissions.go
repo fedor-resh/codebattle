@@ -67,7 +67,7 @@ func (r *Repository) Create(ctx context.Context, userID, matchID, source string)
 	var problemVersionID string
 	if err := tx.QueryRow(ctx, `
 		SELECT problem_version_id FROM matches
-		WHERE id = $1 AND state = 'active'
+		WHERE id = $1 AND state IN ('active', 'waiting_ready')
 			AND (player_one_id = $2 OR player_two_id = $2)
 		FOR UPDATE
 	`, matchID, userID).Scan(&problemVersionID); errors.Is(err, pgx.ErrNoRows) {

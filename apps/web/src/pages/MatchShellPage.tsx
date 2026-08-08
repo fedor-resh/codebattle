@@ -285,7 +285,7 @@ export function MatchShellPage({ currentUser }: { currentUser: User }) {
                 value={source}
                 onChange={handleSourceChange}
                 onCursorChange={handleCursorChange}
-                readOnly={ended || waitingReady || paused}
+                readOnly={ended || paused}
               />
               <CodePane
                 label={`Код ${opponent.username}`}
@@ -306,7 +306,7 @@ export function MatchShellPage({ currentUser }: { currentUser: User }) {
                   value={source}
                   onChange={handleSourceChange}
                   onCursorChange={handleCursorChange}
-                  readOnly={ended || waitingReady || paused}
+                  readOnly={ended || paused}
                 />
               </Tabs.Panel>
               <Tabs.Panel value="opponent" pt="md">
@@ -330,13 +330,13 @@ export function MatchShellPage({ currentUser }: { currentUser: User }) {
                   </Alert>
                 )}
                 <Button
-                  disabled={ended || waitingReady || paused}
+                  disabled={ended || paused}
                   loading={submitMutation.isPending}
                   leftSection={<IconPlayerPlay size={18} />}
                   onClick={() => submitMutation.mutate()}
                   ml="auto"
                 >
-                  Отправить решение
+                  {waitingReady ? 'Проверить вне зачёта' : 'Отправить решение'}
                 </Button>
               </Stack>
             </Paper>
