@@ -21,37 +21,6 @@ func NewPostgresRepository(pool *pgxpool.Pool) *PostgresRepository {
 	return &PostgresRepository{pool: pool}
 }
 
-func (r *PostgresRepository) ExpirePaused(ctx context.Context, now time.Time) (int64, error) {
-	tx, err := r.pool.Begin(ctx)
-	if err != nil {
-		return 0, err
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
-	paused, err := tx.Exec(ctx, `
-		UPDATE matches m SET
-			state = 'paused', paused_from_state = m.state, paused_at = $1
-		FROM users player_one, users player_two
-		WHERE m.state IN ('active', 'waiting_ready')
-			AND player_one.id = m.player_one_id AND player_two.id = m.player_two_id
-			AND (player_one.last_seen_at <= $1::timestamptz - interval '5 seconds'
-				OR player_two.last_seen_at <= $1::timestamptz - interval '5 seconds')
-	`, now)
-	if err != nil {
-		return 0, err
-	}
-	ended, err := tx.Exec(ctx, `
-		UPDATE matches SET state = 'ended', ended_at = $1
-		WHERE state = 'paused' AND paused_at <= $1::timestamptz - interval '60 seconds'
-	`, now)
-	if err != nil {
-		return 0, err
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return 0, err
-	}
-	return paused.RowsAffected() + ended.RowsAffected(), nil
-}
-
 func (r *PostgresRepository) CreateInvitation(
 	ctx context.Context,
 	id, senderID, receiverID string,
@@ -290,60 +259,9 @@ func (r *PostgresRepository) DeclineInvitation(
 }
 
 func (r *PostgresRepository) Match(ctx context.Context, matchID, userID string) (Match, error) {
-	if err := r.refreshConnectionState(ctx, matchID, time.Now().UTC()); err != nil {
-		return Match{}, err
-	}
 	return scanMatch(r.pool.QueryRow(ctx, matchQuery+`
 		WHERE m.id = $1 AND (m.player_one_id = $2 OR m.player_two_id = $2)
 	`, matchID, userID))
-}
-
-func (r *PostgresRepository) refreshConnectionState(ctx context.Context, matchID string, now time.Time) error {
-	tx, err := r.pool.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
-
-	var state string
-	var pausedFromState *string
-	var pausedAt *time.Time
-	var playerOneSeen, playerTwoSeen time.Time
-	err = tx.QueryRow(ctx, `
-		SELECT m.state, m.paused_from_state, m.paused_at,
-			player_one.last_seen_at, player_two.last_seen_at
-		FROM matches m
-		JOIN users player_one ON player_one.id = m.player_one_id
-		JOIN users player_two ON player_two.id = m.player_two_id
-		WHERE m.id = $1 FOR UPDATE OF m
-	`, matchID).Scan(&state, &pausedFromState, &pausedAt, &playerOneSeen, &playerTwoSeen)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return ErrMatchNotFound
-	}
-	if err != nil {
-		return err
-	}
-	connectedAfter := now.Add(-5 * time.Second)
-	bothConnected := playerOneSeen.After(connectedAfter) && playerTwoSeen.After(connectedAfter)
-
-	switch {
-	case (state == "active" || state == "waiting_ready") && !bothConnected:
-		_, err = tx.Exec(ctx, `
-			UPDATE matches SET state = 'paused', paused_from_state = $2, paused_at = $3 WHERE id = $1
-		`, matchID, state, now)
-	case state == "paused" && bothConnected && pausedFromState != nil:
-		_, err = tx.Exec(ctx, `
-			UPDATE matches SET state = $2, paused_from_state = NULL, paused_at = NULL WHERE id = $1
-		`, matchID, *pausedFromState)
-	case state == "paused" && pausedAt != nil && !pausedAt.After(now.Add(-60*time.Second)):
-		_, err = tx.Exec(ctx, `
-			UPDATE matches SET state = 'ended', ended_at = $2 WHERE id = $1
-		`, matchID, now)
-	}
-	if err != nil {
-		return err
-	}
-	return tx.Commit(ctx)
 }
 
 func (r *PostgresRepository) LeaveMatch(ctx context.Context, matchID, userID string, now time.Time) error {

@@ -2,11 +2,8 @@ slug: goroutine-relay
 title: "Эстафета горутин"
 difficulty: easy
 class: concurrency
-requirements:
-  goroutine: true
-  channel: true
 function: Solve
-signature: "func Solve(n int) string"
-version: 1
+signature: "func Solve(n int, work func(string) string) string"
+version: 2
 time_limit_ms: 2000
 memory_limit_mb: 256

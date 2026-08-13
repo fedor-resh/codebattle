@@ -153,11 +153,6 @@ func (r *Runner) Run(
 		result.Message = err.Error()
 		return result
 	}
-	if err := problems.ValidateRequirements(job.SourceCode, job.Requirements); err != nil {
-		result.Status = "compile_error"
-		result.Message = err.Error()
-		return result
-	}
 	if err := r.prepare(job); err != nil {
 		return result
 	}

@@ -24,6 +24,12 @@ var supportedValueTypes = map[string]bool{
 	"map[string]int": true,
 }
 
+var supportedCallbackTypes = map[string]bool{
+	"func(int) int":                   true,
+	"func(string) string":             true,
+	"func(context.Context, int) bool": true,
+}
+
 type Parameter struct {
 	Name string
 	Type string
@@ -64,7 +70,7 @@ func ParseSignature(signature string) (SignatureSchema, error) {
 			return SignatureSchema{}, errors.New("Solve must accept at least one argument")
 		}
 		for _, parameter := range params {
-			if !supportedValueTypes[parameter.Type] {
+			if !supportedValueTypes[parameter.Type] && !supportedCallbackTypes[parameter.Type] {
 				return SignatureSchema{}, fmt.Errorf("unsupported parameter type %s", parameter.Type)
 			}
 		}
@@ -109,100 +115,6 @@ func ValidateSolution(source, expectedSignature string) error {
 		return nil
 	}
 	return fmt.Errorf("required function %s was not found", expected.Function)
-}
-
-// ValidateRequirements performs a pedagogical source-level check. Functional
-// tests still verify that the declared concurrency constructs are used
-// correctly and that the solution terminates.
-func ValidateRequirements(source string, requirements Requirements) error {
-	if requirements.Empty() {
-		return nil
-	}
-	file, err := parser.ParseFile(token.NewFileSet(), "solution.go", source, parser.AllErrors)
-	if err != nil {
-		return fmt.Errorf("parse Go source: %w", err)
-	}
-
-	type importInfo struct {
-		alias string
-		dot   bool
-	}
-	imports := make(map[string]importInfo, len(file.Imports))
-	for _, spec := range file.Imports {
-		path, unquoteErr := strconv.Unquote(spec.Path.Value)
-		if unquoteErr != nil {
-			continue
-		}
-		alias := path[strings.LastIndex(path, "/")+1:]
-		info := importInfo{alias: alias}
-		if spec.Name != nil {
-			info.alias = spec.Name.Name
-			info.dot = spec.Name.Name == "."
-		}
-		imports[path] = info
-	}
-
-	var hasGoroutine, hasChannel, hasWaitGroup, hasMutex, hasSelect, hasContextCancel bool
-	ast.Inspect(file, func(node ast.Node) bool {
-		switch value := node.(type) {
-		case *ast.GoStmt:
-			hasGoroutine = true
-		case *ast.ChanType, *ast.SendStmt:
-			hasChannel = true
-		case *ast.UnaryExpr:
-			if value.Op == token.ARROW {
-				hasChannel = true
-			}
-		case *ast.SelectStmt:
-			hasSelect = true
-		case *ast.SelectorExpr:
-			identifier, ok := value.X.(*ast.Ident)
-			if !ok {
-				break
-			}
-			if imported, ok := imports["sync"]; ok && !imported.dot && identifier.Name == imported.alias {
-				hasWaitGroup = hasWaitGroup || value.Sel.Name == "WaitGroup"
-				hasMutex = hasMutex || value.Sel.Name == "Mutex" || value.Sel.Name == "RWMutex"
-			}
-			if imported, ok := imports["context"]; ok && !imported.dot && identifier.Name == imported.alias {
-				hasContextCancel = hasContextCancel || value.Sel.Name == "WithCancel" ||
-					value.Sel.Name == "WithCancelCause"
-			}
-		case *ast.Ident:
-			if imported, ok := imports["sync"]; ok && imported.dot {
-				hasWaitGroup = hasWaitGroup || value.Name == "WaitGroup"
-				hasMutex = hasMutex || value.Name == "Mutex" || value.Name == "RWMutex"
-			}
-			if imported, ok := imports["context"]; ok && imported.dot {
-				hasContextCancel = hasContextCancel || value.Name == "WithCancel" || value.Name == "WithCancelCause"
-			}
-		}
-		return true
-	})
-
-	missing := make([]string, 0, 6)
-	if requirements.Goroutine && !hasGoroutine {
-		missing = append(missing, "goroutine (оператор go)")
-	}
-	if requirements.Channel && !hasChannel {
-		missing = append(missing, "channel")
-	}
-	if requirements.WaitGroup && !hasWaitGroup {
-		missing = append(missing, "sync.WaitGroup")
-	}
-	if requirements.Mutex && !hasMutex {
-		missing = append(missing, "sync.Mutex или sync.RWMutex")
-	}
-	if requirements.Select && !hasSelect {
-		missing = append(missing, "select")
-	}
-	if requirements.ContextCancel && !hasContextCancel {
-		missing = append(missing, "context.WithCancel")
-	}
-	if len(missing) > 0 {
-		return fmt.Errorf("решение должно использовать: %s", strings.Join(missing, ", "))
-	}
-	return nil
 }
 
 func ValidatePublicTests(schema SignatureSchema, tests []PublicTest) error {
@@ -283,6 +195,40 @@ func GoLiteral(valueType string, raw json.RawMessage) (string, error) {
 			parts = append(parts, strconv.Quote(key)+": "+strconv.Itoa(values[key]))
 		}
 		return "map[string]int{" + strings.Join(parts, ", ") + "}", nil
+	case "func(int) int":
+		var callback string
+		if err := json.Unmarshal(raw, &callback); err != nil {
+			return "", errors.New("must name a callback")
+		}
+		switch callback {
+		case "identity":
+			return "func(value int) int { return value }", nil
+		case "square":
+			return "func(value int) int { return value * value }", nil
+		default:
+			return "", fmt.Errorf("unsupported int callback %q", callback)
+		}
+	case "func(string) string":
+		var callback string
+		if err := json.Unmarshal(raw, &callback); err != nil || callback != "identity" {
+			return "", errors.New("unsupported string callback")
+		}
+		return "func(value string) string { return value }", nil
+	case "func(context.Context, int) bool":
+		var callback string
+		if err := json.Unmarshal(raw, &callback); err != nil || callback != "delay" {
+			return "", errors.New("unsupported cancellable callback")
+		}
+		return `func(ctx context.Context, delay int) bool {
+			timer := time.NewTimer(time.Duration(delay) * time.Millisecond)
+			defer timer.Stop()
+			select {
+			case <-timer.C:
+				return true
+			case <-ctx.Done():
+				return false
+			}
+		}`, nil
 	default:
 		return "", fmt.Errorf("unsupported type %s", valueType)
 	}
@@ -331,12 +277,17 @@ func publicValidationTestSource(schema SignatureSchema, tests []PublicTest) (str
 			index+1,
 		)
 	}
+	imports := "\t\"reflect\"\n\t\"testing\"\n"
+	if strings.Contains(cases.String(), "context.") {
+		imports = "\t\"context\"\n" + imports
+	}
+	if strings.Contains(cases.String(), "time.") {
+		imports += "\t\"time\"\n"
+	}
 	return `package solution
 
 import (
-	"reflect"
-	"testing"
-)
+` + imports + `)
 
 func TestCatalogPublic(t *testing.T) {
 ` + cases.String() + "}\n", nil

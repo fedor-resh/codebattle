@@ -186,9 +186,6 @@ func loadProblem(directory, directoryName string) (Problem, error) {
 	if err := ValidateSolution(string(content["reference.go"]), metadata.Signature); err != nil {
 		return Problem{}, fmt.Errorf("problem %s reference: %w", metadata.Slug, err)
 	}
-	if err := ValidateRequirements(string(content["reference.go"]), metadata.Requirements); err != nil {
-		return Problem{}, fmt.Errorf("problem %s reference: %w", metadata.Slug, err)
-	}
 	schema, _ := ParseSignature(metadata.Signature)
 	if err := ValidatePublicTests(schema, publicTests); err != nil {
 		return Problem{}, fmt.Errorf("problem %s: %w", metadata.Slug, err)
@@ -224,9 +221,6 @@ func validateMetadata(metadata Metadata, directoryName string) error {
 	}
 	if metadata.Class == ClassAlgorithms && !metadata.Requirements.Empty() {
 		return fmt.Errorf("problem %s: algorithm tasks cannot declare concurrency requirements", metadata.Slug)
-	}
-	if metadata.Class == ClassConcurrency && !metadata.Requirements.Goroutine {
-		return fmt.Errorf("problem %s: concurrency tasks must require a goroutine", metadata.Slug)
 	}
 	if metadata.Function != "Solve" {
 		return fmt.Errorf("problem %s: function must be Solve", metadata.Slug)

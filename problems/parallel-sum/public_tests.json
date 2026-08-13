@@ -1,5 +1,5 @@
 [
-  {"arguments": [[1, 2, 3, 4], 2], "expected": 10},
-  {"arguments": [[-5, 2, 8], 3], "expected": 5},
-  {"arguments": [[], 0], "expected": 0}
+  {"arguments": [[1, 2, 3, 4], 2, "identity"], "expected": 10},
+  {"arguments": [[-5, 2, 8], 3, "identity"], "expected": 5},
+  {"arguments": [[], 0, "identity"], "expected": 0}
 ]

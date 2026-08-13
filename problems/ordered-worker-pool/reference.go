@@ -7,7 +7,7 @@ type squareJob struct {
 	value int
 }
 
-func Solve(nums []int, workers int) []int {
+func Solve(nums []int, workers int, work func(int) int) []int {
 	if workers <= 0 {
 		workers = 1
 	}
@@ -19,7 +19,7 @@ func Solve(nums []int, workers int) []int {
 		go func() {
 			defer wait.Done()
 			for job := range jobs {
-				result[job.index] = job.value * job.value
+				result[job.index] = work(job.value)
 			}
 		}()
 	}

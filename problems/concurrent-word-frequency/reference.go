@@ -2,7 +2,7 @@ package solution
 
 import "sync"
 
-func Solve(words []string, workers int) map[string]int {
+func Solve(words []string, workers int, work func(string) string) map[string]int {
 	if workers <= 0 {
 		workers = 1
 	}
@@ -15,6 +15,7 @@ func Solve(words []string, workers int) map[string]int {
 		go func() {
 			defer wait.Done()
 			for word := range jobs {
+				word = work(word)
 				mutex.Lock()
 				frequencies[word]++
 				mutex.Unlock()

@@ -2,7 +2,7 @@ package solution
 
 import "sync"
 
-func Solve(nums []int, workers int) int {
+func Solve(nums []int, workers int, work func(int) int) int {
 	if workers <= 0 {
 		workers = 1
 	}
@@ -15,7 +15,7 @@ func Solve(nums []int, workers int) int {
 			defer wait.Done()
 			sum := 0
 			for value := range jobs {
-				sum += value
+				sum += work(value)
 			}
 			partials <- sum
 		}()

@@ -40,48 +40,6 @@ func TestCatalogContainsThirtyValidProblems(t *testing.T) {
 	}
 }
 
-func TestValidateRequirementsAcceptsAliasedImports(t *testing.T) {
-	source := `package solution
-
-import (
-	c "context"
-	s "sync"
-)
-
-func Solve(input int) int {
-	ctx, cancel := c.WithCancel(c.Background())
-	defer cancel()
-	values := make(chan int)
-	var wait s.WaitGroup
-	wait.Add(1)
-	go func() { defer wait.Done(); values <- input }()
-	var result int
-	select {
-	case result = <-values:
-	case <-ctx.Done():
-	}
-	wait.Wait()
-	return result
-}`
-	requirements := Requirements{
-		Goroutine: true, Channel: true, WaitGroup: true,
-		Mutex: false, Select: true, ContextCancel: true,
-	}
-	if err := ValidateRequirements(source, requirements); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestValidateRequirementsListsMissingConstructs(t *testing.T) {
-	err := ValidateRequirements(
-		"package solution\nfunc Solve(input int) int { return input }",
-		Requirements{Goroutine: true, Channel: true, Mutex: true},
-	)
-	if err == nil {
-		t.Fatal("sequential source passed concurrency requirements")
-	}
-}
-
 func TestValidateMetadataRejectsInvalidClassAndRequirements(t *testing.T) {
 	base := Metadata{
 		Slug: "sample", Title: "Sample", Difficulty: "easy", Class: ClassAlgorithms,
@@ -101,11 +59,22 @@ func TestValidateMetadataRejectsInvalidClassAndRequirements(t *testing.T) {
 		t.Fatal("algorithm task with concurrency requirements was accepted")
 	}
 
-	concurrencyWithoutGoroutine := base
-	concurrencyWithoutGoroutine.Class = ClassConcurrency
-	concurrencyWithoutGoroutine.Requirements.Channel = true
-	if err := validateMetadata(concurrencyWithoutGoroutine, "sample"); err == nil {
-		t.Fatal("concurrency task without a goroutine requirement was accepted")
+	concurrencyWithoutRequirements := base
+	concurrencyWithoutRequirements.Class = ClassConcurrency
+	if err := validateMetadata(concurrencyWithoutRequirements, "sample"); err != nil {
+		t.Fatalf("concurrency task should be validated by behavior, not source requirements: %v", err)
+	}
+}
+
+func TestParseSignatureSupportsLongRunningCallbacks(t *testing.T) {
+	for _, signature := range []string{
+		"func Solve(values []int, workers int, work func(int) int) []int",
+		"func Solve(values []string, workers int, work func(string) string) map[string]int",
+		"func Solve(delays []int, timeoutMS int, work func(context.Context, int) bool) int",
+	} {
+		if _, err := ParseSignature(signature); err != nil {
+			t.Fatalf("ParseSignature(%q): %v", signature, err)
+		}
 	}
 }
 

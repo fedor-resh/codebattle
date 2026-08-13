@@ -178,7 +178,6 @@ export function MatchShellPage({ currentUser }: { currentUser: User }) {
   const opponentScore = currentIsPlayerOne ? match.player_two_score : match.player_one_score;
   const ended = match.state === 'ended';
   const waitingReady = match.state === 'waiting_ready';
-  const paused = match.state === 'paused';
   const opponentSnapshot = match.code_snapshots.find(
     (snapshot) =>
       snapshot.user_id === opponent.id && snapshot.problem_version_id === match.problem?.id,
@@ -217,11 +216,11 @@ export function MatchShellPage({ currentUser }: { currentUser: User }) {
                 {problemClassLabel[match.problem_class]}
               </Badge>
               <Badge
-                color={ended ? 'gray' : paused ? 'red' : 'green'}
+                color={ended ? 'gray' : 'green'}
                 variant="light"
                 leftSection={<IconCloudCheck size={13} />}
               >
-                {ended ? 'Серия завершена' : paused ? 'Соединение потеряно' : 'Комната активна'}
+                {ended ? 'Серия завершена' : 'Комната активна'}
               </Badge>
             </Group>
             <Group gap="lg">
@@ -265,12 +264,6 @@ export function MatchShellPage({ currentUser }: { currentUser: User }) {
           Задача зафиксирована для раунда. Код соперника обновляется автоматически.
         </Alert>
 
-        {paused && (
-          <Alert color="red" title="Раунд на паузе">
-            Ожидаем возвращение второго игрока. Через 60 секунд серия завершится автоматически.
-          </Alert>
-        )}
-
         {waitingReady && (
           <ReadyOverlay
             winner={winner}
@@ -292,7 +285,7 @@ export function MatchShellPage({ currentUser }: { currentUser: User }) {
                 value={source}
                 onChange={handleSourceChange}
                 onCursorChange={handleCursorChange}
-                readOnly={ended || paused}
+                readOnly={ended}
                 functionSignature={match.problem.function_signature}
               />
               <CodePane
@@ -314,7 +307,7 @@ export function MatchShellPage({ currentUser }: { currentUser: User }) {
                   value={source}
                   onChange={handleSourceChange}
                   onCursorChange={handleCursorChange}
-                  readOnly={ended || paused}
+                  readOnly={ended}
                   functionSignature={match.problem.function_signature}
                 />
               </Tabs.Panel>
@@ -331,7 +324,7 @@ export function MatchShellPage({ currentUser }: { currentUser: User }) {
             <Paper withBorder p="md" radius="md">
               <Stack>
                 <Button
-                  disabled={ended || paused}
+                  disabled={ended}
                   loading={submitMutation.isPending}
                   leftSection={<IconPlayerPlay size={18} />}
                   onClick={() => submitMutation.mutate()}

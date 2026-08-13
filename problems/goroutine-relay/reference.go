@@ -5,41 +5,34 @@ import (
 	"sync"
 )
 
-func Solve(n int) string {
+func Solve(n int, work func(string) string) string {
 	if n <= 0 {
 		return ""
 	}
 
-	ping := make(chan struct{})
-	pong := make(chan struct{})
-	done := make(chan struct{})
-	var result strings.Builder
+	pings := make([]string, n)
+	pongs := make([]string, n)
 	var wait sync.WaitGroup
 	wait.Add(2)
 
 	go func() {
 		defer wait.Done()
-		for range n {
-			<-ping
-			result.WriteString("ping")
-			pong <- struct{}{}
+		for index := range n {
+			pings[index] = work("ping")
 		}
 	}()
 	go func() {
 		defer wait.Done()
 		for index := range n {
-			<-pong
-			result.WriteString("pong")
-			if index+1 == n {
-				close(done)
-			} else {
-				ping <- struct{}{}
-			}
+			pongs[index] = work("pong")
 		}
 	}()
 
-	ping <- struct{}{}
-	<-done
 	wait.Wait()
+	var result strings.Builder
+	for index := range n {
+		result.WriteString(pings[index])
+		result.WriteString(pongs[index])
+	}
 	return result.String()
 }

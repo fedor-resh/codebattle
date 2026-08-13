@@ -40,7 +40,7 @@ export function ProblemPanel({ problem }: { problem: Problem }) {
           <Code block>{problem.function_signature}</Code>
           {activeRequirements.length > 0 && (
             <div>
-              <Text size="sm" fw={700} mb={6}>Обязательные конструкции</Text>
+              <Text size="sm" fw={700} mb={6}>Рекомендуемые инструменты</Text>
               <Group gap="xs">
                 {activeRequirements.map((requirement) => (
                   <Badge key={requirement} color="violet" variant="light">

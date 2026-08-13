@@ -1,5 +1,5 @@
 [
-  {"arguments": [1], "expected": "pingpong"},
-  {"arguments": [3], "expected": "pingpongpingpongpingpong"},
-  {"arguments": [0], "expected": ""}
+  {"arguments": [1, "identity"], "expected": "pingpong"},
+  {"arguments": [3, "identity"], "expected": "pingpongpingpongpingpong"},
+  {"arguments": [0, "identity"], "expected": ""}
 ]

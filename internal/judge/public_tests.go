@@ -53,10 +53,18 @@ func publicTestSource(tests []problems.PublicTest, functionSignature string) (st
 			expected,
 		)
 	}
+	optionalImports := ""
+	if strings.Contains(cases.String(), "context.") {
+		optionalImports += "\t\"context\"\n"
+	}
+	if strings.Contains(cases.String(), "time.") {
+		optionalImports += "\t\"time\"\n"
+	}
 
 	return fmt.Sprintf(`package solution_test
 
 import (
+%s
 	"encoding/json"
 	"fmt"
 	"io"
@@ -183,7 +191,7 @@ func TestCodebattlePublic(t *testing.T) {
 		}
 	}
 }
-`, schema.Result, schema.Result, cases.String(), publicResultMarker), nil
+`, optionalImports, schema.Result, schema.Result, cases.String(), publicResultMarker), nil
 }
 
 func collectPublicTestReport(

@@ -1,7 +1,6 @@
 package judge
 
 import (
-	"context"
 	"encoding/json"
 	"go/format"
 	"os"
@@ -13,22 +12,6 @@ import (
 	"codebattle.local/codebattle/internal/problems"
 	"codebattle.local/codebattle/internal/submissions"
 )
-
-func TestRunnerRevalidatesConcurrencyRequirements(t *testing.T) {
-	runner := NewRunner(Config{})
-	result := runner.Run(context.Background(), submissions.Job{
-		Submission:        submissions.Submission{ID: "requirements-check"},
-		FunctionSignature: "func Solve(input int) int",
-		SourceCode:        "package solution\nfunc Solve(input int) int { return input }",
-		Requirements:      problems.Requirements{Goroutine: true},
-	}, func() error {
-		t.Fatal("invalid source reached the running state")
-		return nil
-	})
-	if result.Status != "compile_error" || !strings.Contains(result.Message, "goroutine") {
-		t.Fatalf("result = %+v", result)
-	}
-}
 
 func TestCompileAndRuntimeContainersAreIsolated(t *testing.T) {
 	runner := NewRunner(Config{
@@ -195,6 +178,44 @@ func TestPublicTestSourceIsValidGoAndQuotesValues(t *testing.T) {
 	}
 	if !strings.Contains(source, publicResultMarker) {
 		t.Fatal("generated public test does not contain the result marker")
+	}
+}
+
+func TestGeneratedPublicTestSupportsCancellableWork(t *testing.T) {
+	directory := t.TempDir()
+	publicSource, err := publicTestSource([]problems.PublicTest{
+		testPublicCase([]string{`[1]`, `100`, `"delay"`}, `0`),
+	}, "func Solve(delays []int, timeoutMS int, work func(context.Context, int) bool) int")
+	if err != nil {
+		t.Fatal(err)
+	}
+	files := map[string]string{
+		"go.mod": "module solution\n\ngo 1.26.0\n",
+		"solution.go": `package solution
+
+import "context"
+
+func Solve(delays []int, timeoutMS int, work func(context.Context, int) bool) int {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	if len(delays) > 0 && work(ctx, delays[0]) {
+		return 0
+	}
+	return -1
+}
+`,
+		"public_test.go": publicSource,
+	}
+	for name, content := range files {
+		if err := os.WriteFile(filepath.Join(directory, name), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	command := exec.Command("go", "test", ".")
+	command.Dir = directory
+	command.Env = append(os.Environ(), "GOWORK=off")
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("generated timed callback test failed: %v\n%s", err, output)
 	}
 }
 

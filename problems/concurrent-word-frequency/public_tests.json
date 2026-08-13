@@ -1,5 +1,5 @@
 [
-  {"arguments": [["go", "code", "go", "race"], 3], "expected": {"code": 1, "go": 2, "race": 1}},
-  {"arguments": [["A", "a", "A"], 2], "expected": {"A": 2, "a": 1}},
-  {"arguments": [[], 0], "expected": {}}
+  {"arguments": [["go", "code", "go", "race"], 3, "identity"], "expected": {"code": 1, "go": 2, "race": 1}},
+  {"arguments": [["A", "a", "A"], 2, "identity"], "expected": {"A": 2, "a": 1}},
+  {"arguments": [[], 0, "identity"], "expected": {}}
 ]

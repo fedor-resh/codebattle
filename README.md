@@ -15,7 +15,7 @@
 - изолированные compile/runtime Docker-контейнеры без сети;
 - результаты `accepted`, `wrong_answer`, `compile_error`, `runtime_error` и `time_limit`;
 - счёт серии, победитель раунда, ready-flow и выбор задач без повторов;
-- пауза при разрыве соединения и восстановление в течение 60 секунд;
+- матч остаётся активным при временном разрыве соединения;
 - тёмная/светлая темы Mantine, синхронизированные с Monaco;
 - health/readiness endpoints, JSON-логи, security headers, Origin-guard и базовые rate limits.
 

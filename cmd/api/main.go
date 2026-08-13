@@ -74,7 +74,6 @@ func main() {
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
-	go expirePausedMatches(ctx, logger, duelRepository)
 	go cleanExpiredRecords(ctx, logger, pool)
 
 	go func() {
@@ -115,24 +114,6 @@ func cleanExpiredRecords(ctx context.Context, logger *slog.Logger, pool *pgxpool
 				WHERE status = 'pending' AND expires_at <= now()
 			`); err != nil {
 				logger.Error("expire invitations", "error", err)
-			}
-		}
-	}
-}
-
-func expirePausedMatches(ctx context.Context, logger *slog.Logger, repository *duels.PostgresRepository) {
-	ticker := time.NewTicker(5 * time.Second)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case now := <-ticker.C:
-			expired, err := repository.ExpirePaused(ctx, now.UTC())
-			if err != nil {
-				logger.Error("expire paused matches", "error", err)
-			} else if expired > 0 {
-				logger.Info("paused matches expired", "count", expired)
 			}
 		}
 	}

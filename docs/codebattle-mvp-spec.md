@@ -155,12 +155,10 @@ Lobby содержит:
 
 - WebSocket отправляет heartbeat каждые 15 секунд.
 - Redis presence connection имеет TTL 45 секунд.
-- При закрытии единственного управляющего соединения матч переходит в `paused`,
-  а backend запускает 60-секундный reconnect deadline.
-- В состоянии `paused` редакторы и отправка заблокированы у обоих игроков.
-- Reconnect до deadline восстанавливает snapshot и переводит матч в прежнее
-  состояние `active` или `waiting_ready`.
-- После deadline матч завершается с причиной `disconnect_timeout`.
+- Временная потеря соединения не меняет состояние матча, не блокирует редакторы
+  и отправку решений и не запускает reconnect deadline.
+- После восстановления соединения клиент продолжает polling и получает
+  актуальные snapshots без отдельного уведомления о паузе.
 - Явный выход завершает матч немедленно с причиной `player_left`.
 - Подтвержденный игрок может ждать второго бессрочно, пока оба остаются
   подключенными.
@@ -263,7 +261,7 @@ Route guard вызывает `GET /api/v1/me`. Гость на защищенн�
 | `ProblemPanel` | `Paper`, `ScrollArea`, `Accordion` | Markdown-условие, сигнатура и public tests. |
 | `CodePane` | `Paper`, `Badge`, Monaco | Заголовок владельца, редактор, локальный Go-autocomplete и каретка соперника с username. |
 | `JudgeResultPanel` | `Alert`, `Code`, `Accordion` | Статус и безопасная диагностическая информация. |
-| `ConnectionStatus` | `Badge`, `Loader` | Online, reconnecting, paused, disconnected. |
+| `ConnectionStatus` | `Badge`, `Loader` | Online, reconnecting, disconnected. |
 | `ReadyOverlay` | `Overlay`, `Center`, `Button` | Победитель и готовность игроков. |
 
 `Notifications` показывает сетевые ошибки, истечение приглашения и системные
@@ -536,8 +534,6 @@ Server envelope:
 | `invitation.expired` | `invitationId`, `expiredAt`. |
 | `match.created` | `matchId`, `redirectPath`. |
 | `match.state_changed` | `matchId`, `state`, `version`. |
-| `match.paused` | `matchId`, `disconnectedUserId`, `reconnectDeadline`. |
-| `match.resumed` | `matchId`, `resumedAt`. |
 | `match.ended` | `matchId`, `reason`, `finalScore`. |
 | `editor.ack` | `roundId`, `revision`, `requestId`. |
 | `editor.snapshot` | `roundId`, `userId`, `revision`, `source`, `cursorLine`, `cursorColumn`. |
@@ -881,7 +877,7 @@ CREATE TYPE invitation_status AS ENUM (
   'pending', 'accepted', 'declined', 'expired', 'cancelled'
 );
 CREATE TYPE match_status AS ENUM (
-  'connecting', 'active', 'paused', 'waiting_ready', 'ended'
+  'connecting', 'active', 'waiting_ready', 'ended'
 );
 CREATE TYPE round_status AS ENUM ('active', 'judging', 'finished');
 CREATE TYPE submission_status AS ENUM (
@@ -1423,7 +1419,7 @@ Rate limit реализуется Redis token bucket. Ответ `429` соде�
 
 - REST latency/error rate по route template.
 - Текущие WebSocket connections.
-- Активные, paused и waiting-ready матчи.
+- Активные и waiting-ready матчи.
 - p50/p95 editor relay latency.
 - Judge stream depth и oldest job age.
 - Compile/run duration и результат submissions.
@@ -1515,9 +1511,8 @@ Playwright запускает два независимых browser context:
 6. После победы редакторы и отправка остаются доступны вне зачета, а победитель
    и счет не меняются повторными успешными отправками.
 7. Один ready не запускает раунд; второй ready запускает.
-8. Reconnect в пределах 60 секунд восстанавливает код.
-9. Истечение reconnect deadline завершает матч.
-10. После исчерпания всех задач выбранного класса создается новый shuffled cycle этого класса.
+8. Временный разрыв соединения не блокирует и не завершает матч, а reconnect восстанавливает код.
+9. После исчерпания всех задач выбранного класса создается новый shuffled cycle этого класса.
 
 ### 16.6. Нагрузочные тесты
 
@@ -1545,7 +1540,7 @@ MVP готов, если одновременно выполнены услов�
 - Одновременные успешные отправки дают ровно одного справедливого победителя.
 - После победы счет увеличивается один раз.
 - Следующий раунд начинается только после двух ready.
-- Reconnect за 60 секунд восстанавливает состояние; превышение завершает матч.
+- Временный разрыв соединения не блокирует и не завершает матч.
 - Новый цикл задач создается после исчерпания пула без немедленного повтора.
 - Sandbox security suite проходит полностью.
 - E2E, accessibility и нагрузочные тесты проходят в CI или staging.

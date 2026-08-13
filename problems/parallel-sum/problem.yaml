@@ -2,12 +2,8 @@ slug: parallel-sum
 title: "Параллельная сумма"
 difficulty: easy
 class: concurrency
-requirements:
-  goroutine: true
-  channel: true
-  wait_group: true
 function: Solve
-signature: "func Solve(nums []int, workers int) int"
-version: 1
+signature: "func Solve(nums []int, workers int, work func(int) int) int"
+version: 2
 time_limit_ms: 2000
 memory_limit_mb: 256

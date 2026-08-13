@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-func Solve(delays []int, timeoutMS int) int {
+func Solve(delays []int, timeoutMS int, work func(context.Context, int) bool) int {
 	if len(delays) == 0 || timeoutMS <= 0 {
 		return -1
 	}
@@ -18,15 +18,11 @@ func Solve(delays []int, timeoutMS int) int {
 	for index, delay := range delays {
 		go func() {
 			defer wait.Done()
-			timer := time.NewTimer(time.Duration(delay) * time.Millisecond)
-			defer timer.Stop()
-			select {
-			case <-timer.C:
+			if work(ctx, delay) {
 				select {
 				case results <- index:
 				case <-ctx.Done():
 				}
-			case <-ctx.Done():
 			}
 		}()
 	}
