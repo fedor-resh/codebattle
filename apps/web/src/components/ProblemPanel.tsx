@@ -4,12 +4,23 @@ import type { Problem } from '../api/client';
 
 const difficultyLabel = { easy: 'Простая', medium: 'Средняя', hard: 'Сложная' };
 const difficultyColor = { easy: 'green', medium: 'yellow', hard: 'red' };
+const requirementLabel = {
+  goroutine: 'goroutine',
+  channel: 'channel',
+  wait_group: 'sync.WaitGroup',
+  mutex: 'sync.Mutex',
+  select: 'select',
+  context_cancel: 'context.WithCancel',
+} as const;
 
 function formatValue(value: unknown): string {
   return JSON.stringify(value, null, 2) ?? String(value);
 }
 
 export function ProblemPanel({ problem }: { problem: Problem }) {
+  const activeRequirements = (Object.keys(requirementLabel) as Array<keyof typeof requirementLabel>)
+    .filter((requirement) => problem.requirements[requirement]);
+
   return (
     <Paper withBorder p="lg" h="100%">
       <ScrollArea h="100%" offsetScrollbars>
@@ -27,6 +38,18 @@ export function ProblemPanel({ problem }: { problem: Problem }) {
           </div>
           <Text style={{ whiteSpace: 'pre-wrap' }}>{problem.statement_markdown.replace(/^# .+\n+/, '')}</Text>
           <Code block>{problem.function_signature}</Code>
+          {activeRequirements.length > 0 && (
+            <div>
+              <Text size="sm" fw={700} mb={6}>Обязательные конструкции</Text>
+              <Group gap="xs">
+                {activeRequirements.map((requirement) => (
+                  <Badge key={requirement} color="violet" variant="light">
+                    {requirementLabel[requirement]}
+                  </Badge>
+                ))}
+              </Group>
+            </div>
+          )}
           <Accordion variant="contained" defaultValue="example-0">
             {problem.public_tests.map((example, index) => (
               <Accordion.Item key={`example-${index}`} value={`example-${index}`}>

@@ -1,0 +1,15 @@
+slug: fastest-handler
+title: "Самый быстрый обработчик"
+difficulty: hard
+class: concurrency
+requirements:
+  goroutine: true
+  channel: true
+  wait_group: true
+  select: true
+  context_cancel: true
+function: Solve
+signature: "func Solve(delays []int, timeoutMS int) int"
+version: 1
+time_limit_ms: 3000
+memory_limit_mb: 256

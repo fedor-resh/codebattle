@@ -7,21 +7,24 @@ import (
 	"encoding/json"
 	"errors"
 	"time"
+
+	"codebattle.local/codebattle/internal/problems"
 )
 
 var (
-	ErrSelfInvitation  = errors.New("cannot invite yourself")
-	ErrUserNotFound    = errors.New("user not found")
-	ErrUserUnavailable = errors.New("user is unavailable")
-	ErrInvitationBusy  = errors.New("user already has an invitation")
-	ErrInvitationGone  = errors.New("invitation is no longer pending")
-	ErrForbidden       = errors.New("forbidden")
-	ErrMatchNotFound   = errors.New("match not found")
-	ErrProblemsMissing = errors.New("problem catalog is empty")
-	ErrRoundNotActive  = errors.New("round is not active")
-	ErrStaleRevision   = errors.New("stale editor revision")
-	ErrSourceTooLarge  = errors.New("source is too large")
-	ErrInvalidCursor   = errors.New("invalid editor cursor")
+	ErrSelfInvitation      = errors.New("cannot invite yourself")
+	ErrUserNotFound        = errors.New("user not found")
+	ErrUserUnavailable     = errors.New("user is unavailable")
+	ErrInvitationBusy      = errors.New("user already has an invitation")
+	ErrInvitationGone      = errors.New("invitation is no longer pending")
+	ErrForbidden           = errors.New("forbidden")
+	ErrMatchNotFound       = errors.New("match not found")
+	ErrProblemsMissing     = errors.New("problem catalog is empty")
+	ErrRoundNotActive      = errors.New("round is not active")
+	ErrStaleRevision       = errors.New("stale editor revision")
+	ErrSourceTooLarge      = errors.New("source is too large")
+	ErrInvalidCursor       = errors.New("invalid editor cursor")
+	ErrInvalidProblemClass = errors.New("invalid problem class")
 )
 
 const invitationTTL = 30 * time.Second
@@ -32,11 +35,12 @@ type Player struct {
 }
 
 type Invitation struct {
-	ID        string    `json:"id"`
-	Sender    Player    `json:"sender"`
-	Receiver  Player    `json:"receiver"`
-	Status    string    `json:"status"`
-	ExpiresAt time.Time `json:"expires_at"`
+	ID           string         `json:"id"`
+	Sender       Player         `json:"sender"`
+	Receiver     Player         `json:"receiver"`
+	Status       string         `json:"status"`
+	ProblemClass problems.Class `json:"problem_class"`
+	ExpiresAt    time.Time      `json:"expires_at"`
 }
 
 type Match struct {
@@ -46,6 +50,7 @@ type Match struct {
 	PlayerOneScore int            `json:"player_one_score"`
 	PlayerTwoScore int            `json:"player_two_score"`
 	State          string         `json:"state"`
+	ProblemClass   problems.Class `json:"problem_class"`
 	Problem        *Problem       `json:"problem,omitempty"`
 	RoundNumber    int            `json:"round_number"`
 	RoundWinnerID  string         `json:"round_winner_id,omitempty"`
@@ -66,16 +71,18 @@ type CodeSnapshot struct {
 }
 
 type Problem struct {
-	ID                string          `json:"id"`
-	Slug              string          `json:"slug"`
-	Title             string          `json:"title"`
-	Difficulty        string          `json:"difficulty"`
-	Statement         string          `json:"statement_markdown"`
-	FunctionSignature string          `json:"function_signature"`
-	StarterCode       string          `json:"starter_code"`
-	PublicTests       json.RawMessage `json:"public_tests"`
-	TimeLimitMS       int             `json:"time_limit_ms"`
-	MemoryLimitMB     int             `json:"memory_limit_mb"`
+	ID                string                `json:"id"`
+	Slug              string                `json:"slug"`
+	Title             string                `json:"title"`
+	Difficulty        string                `json:"difficulty"`
+	ProblemClass      problems.Class        `json:"problem_class"`
+	Requirements      problems.Requirements `json:"requirements"`
+	Statement         string                `json:"statement_markdown"`
+	FunctionSignature string                `json:"function_signature"`
+	StarterCode       string                `json:"starter_code"`
+	PublicTests       json.RawMessage       `json:"public_tests"`
+	TimeLimitMS       int                   `json:"time_limit_ms"`
+	MemoryLimitMB     int                   `json:"memory_limit_mb"`
 }
 
 type State struct {
@@ -85,7 +92,7 @@ type State struct {
 }
 
 type Repository interface {
-	CreateInvitation(context.Context, string, string, string, time.Time, time.Time) (Invitation, error)
+	CreateInvitation(context.Context, string, string, string, problems.Class, time.Time, time.Time) (Invitation, error)
 	State(context.Context, string, time.Time) (State, error)
 	AcceptInvitation(context.Context, string, string, string, time.Time) (Match, error)
 	DeclineInvitation(context.Context, string, string, time.Time) error
@@ -104,12 +111,24 @@ func NewService(repository Repository) *Service {
 	return &Service{repository: repository, now: time.Now}
 }
 
-func (s *Service) CreateInvitation(ctx context.Context, senderID, receiverID string) (Invitation, error) {
+func (s *Service) CreateInvitation(
+	ctx context.Context,
+	senderID, receiverID string,
+	problemClass problems.Class,
+) (Invitation, error) {
 	if senderID == receiverID {
 		return Invitation{}, ErrSelfInvitation
 	}
+	if problemClass == "" {
+		problemClass = problems.ClassAlgorithms
+	}
+	if !problems.IsValidClass(problemClass) {
+		return Invitation{}, ErrInvalidProblemClass
+	}
 	now := s.now().UTC()
-	return s.repository.CreateInvitation(ctx, randomID(), senderID, receiverID, now, now.Add(invitationTTL))
+	return s.repository.CreateInvitation(
+		ctx, randomID(), senderID, receiverID, problemClass, now, now.Add(invitationTTL),
+	)
 }
 
 func (s *Service) State(ctx context.Context, userID string) (State, error) {

@@ -1,7 +1,8 @@
-import { Avatar, Button, Group, Modal, Stack, Text, Title } from '@mantine/core';
+import { Avatar, Badge, Button, Group, Modal, Stack, Text, Title } from '@mantine/core';
 import { IconCheck, IconX } from '@tabler/icons-react';
 
 import type { Invitation } from '../api/client';
+import { problemClassLabel } from '../problemClasses';
 import { InvitationCountdown } from './InvitationCountdown';
 
 export function InvitationModal({
@@ -38,6 +39,12 @@ export function InvitationModal({
               </Text>
             </div>
           </Group>
+          <Badge
+            variant="light"
+            color={invitation.problem_class === 'concurrency' ? 'violet' : 'blue'}
+          >
+            {problemClassLabel[invitation.problem_class]}
+          </Badge>
           <InvitationCountdown expiresAt={invitation.expires_at} />
           <Group grow>
             <Button

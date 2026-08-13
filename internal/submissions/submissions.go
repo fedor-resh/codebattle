@@ -38,6 +38,7 @@ type Job struct {
 	FunctionSignature string
 	SourceCode        string
 	PublicTests       []problems.PublicTest
+	Requirements      problems.Requirements
 	HiddenTestSource  string
 	TimeLimitMS       int
 	MemoryLimitMB     int
@@ -61,20 +62,29 @@ func (r *Repository) Create(ctx context.Context, userID, matchID, source string)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
-	var problemVersionID, functionSignature string
+	var problemVersionID, functionSignature, encodedRequirements string
 	if err := tx.QueryRow(ctx, `
-		SELECT match.problem_version_id, problem.function_signature
+		SELECT match.problem_version_id, problem.function_signature, problem.requirements::text
 		FROM matches match
 		JOIN problem_versions problem ON problem.id = match.problem_version_id
 		WHERE match.id = $1 AND match.state IN ('active', 'waiting_ready')
 			AND (player_one_id = $2 OR player_two_id = $2)
 		FOR UPDATE OF match
-	`, matchID, userID).Scan(&problemVersionID, &functionSignature); errors.Is(err, pgx.ErrNoRows) {
+	`, matchID, userID).Scan(
+		&problemVersionID, &functionSignature, &encodedRequirements,
+	); errors.Is(err, pgx.ErrNoRows) {
 		return Submission{}, ErrMatchNotFound
 	} else if err != nil {
 		return Submission{}, err
 	}
 	if err := problems.ValidateSolution(source, functionSignature); err != nil {
+		return Submission{}, fmt.Errorf("%w: %v", ErrInvalidSource, err)
+	}
+	var requirements problems.Requirements
+	if err := json.Unmarshal([]byte(encodedRequirements), &requirements); err != nil {
+		return Submission{}, fmt.Errorf("decode problem requirements: %w", err)
+	}
+	if err := problems.ValidateRequirements(source, requirements); err != nil {
 		return Submission{}, fmt.Errorf("%w: %v", ErrInvalidSource, err)
 	}
 
@@ -154,10 +164,11 @@ func (r *Repository) Claim(ctx context.Context) (Job, error) {
 	defer func() { _ = tx.Rollback(ctx) }()
 
 	var job Job
-	var publicTests string
+	var publicTests, encodedRequirements string
 	err = tx.QueryRow(ctx, `
 		SELECT s.id, s.match_id, s.user_id, s.status, s.created_at,
-			s.problem_version_id, problem.function_signature, s.source_code, problem.public_tests::text,
+			s.problem_version_id, problem.function_signature, problem.requirements::text,
+			s.source_code, problem.public_tests::text,
 			bundle.hidden_test_source,
 			problem.time_limit_ms, problem.memory_limit_mb
 		FROM submissions s
@@ -169,7 +180,8 @@ func (r *Repository) Claim(ctx context.Context) (Job, error) {
 		LIMIT 1
 	`).Scan(
 		&job.ID, &job.MatchID, &job.UserID, &job.Status, &job.CreatedAt,
-		&job.ProblemVersionID, &job.FunctionSignature, &job.SourceCode, &publicTests, &job.HiddenTestSource,
+		&job.ProblemVersionID, &job.FunctionSignature, &encodedRequirements,
+		&job.SourceCode, &publicTests, &job.HiddenTestSource,
 		&job.TimeLimitMS, &job.MemoryLimitMB,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -180,6 +192,9 @@ func (r *Repository) Claim(ctx context.Context) (Job, error) {
 	}
 	if err := json.Unmarshal([]byte(publicTests), &job.PublicTests); err != nil {
 		return Job{}, fmt.Errorf("decode public tests for submission %s: %w", job.ID, err)
+	}
+	if err := json.Unmarshal([]byte(encodedRequirements), &job.Requirements); err != nil {
+		return Job{}, fmt.Errorf("decode requirements for submission %s: %w", job.ID, err)
 	}
 	if _, err := tx.Exec(ctx, `
 		UPDATE submissions SET status = 'compiling', claimed_at = now() WHERE id = $1

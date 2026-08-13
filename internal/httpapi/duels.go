@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"codebattle.local/codebattle/internal/duels"
+	"codebattle.local/codebattle/internal/problems"
 )
 
 type duelHandlers struct {
@@ -13,7 +14,8 @@ type duelHandlers struct {
 }
 
 type createInvitationRequest struct {
-	ReceiverID string `json:"receiver_id"`
+	ReceiverID   string         `json:"receiver_id"`
+	ProblemClass problems.Class `json:"problem_class"`
 }
 
 type updateCodeRequest struct {
@@ -33,7 +35,9 @@ func (h duelHandlers) createInvitation(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, http.StatusBadRequest, "INVALID_REQUEST", "Укажите receiver_id", nil)
 		return
 	}
-	invitation, err := h.service.CreateInvitation(r.Context(), user.ID, input.ReceiverID)
+	invitation, err := h.service.CreateInvitation(
+		r.Context(), user.ID, input.ReceiverID, input.ProblemClass,
+	)
 	if err != nil {
 		h.writeDuelError(w, r, err)
 		return
@@ -170,6 +174,8 @@ func (h duelHandlers) writeDuelError(w http.ResponseWriter, r *http.Request, err
 		writeError(w, r, http.StatusRequestEntityTooLarge, "SOURCE_TOO_LARGE", "Максимальный размер исходника — 64 КБ", nil)
 	case errors.Is(err, duels.ErrInvalidCursor):
 		writeError(w, r, http.StatusBadRequest, "INVALID_CURSOR", "Некорректная позиция курсора", nil)
+	case errors.Is(err, duels.ErrInvalidProblemClass):
+		writeError(w, r, http.StatusUnprocessableEntity, "INVALID_PROBLEM_CLASS", "Неизвестный класс задач", nil)
 	default:
 		writeError(w, r, http.StatusInternalServerError, "INTERNAL_ERROR", "Внутренняя ошибка сервера", nil)
 	}

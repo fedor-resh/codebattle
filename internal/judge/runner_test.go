@@ -1,6 +1,7 @@
 package judge
 
 import (
+	"context"
 	"encoding/json"
 	"go/format"
 	"os"
@@ -12,6 +13,22 @@ import (
 	"codebattle.local/codebattle/internal/problems"
 	"codebattle.local/codebattle/internal/submissions"
 )
+
+func TestRunnerRevalidatesConcurrencyRequirements(t *testing.T) {
+	runner := NewRunner(Config{})
+	result := runner.Run(context.Background(), submissions.Job{
+		Submission:        submissions.Submission{ID: "requirements-check"},
+		FunctionSignature: "func Solve(input int) int",
+		SourceCode:        "package solution\nfunc Solve(input int) int { return input }",
+		Requirements:      problems.Requirements{Goroutine: true},
+	}, func() error {
+		t.Fatal("invalid source reached the running state")
+		return nil
+	})
+	if result.Status != "compile_error" || !strings.Contains(result.Message, "goroutine") {
+		t.Fatalf("result = %+v", result)
+	}
+}
 
 func TestCompileAndRuntimeContainersAreIsolated(t *testing.T) {
 	runner := NewRunner(Config{

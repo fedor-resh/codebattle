@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"codebattle.local/codebattle/internal/duels"
 	"codebattle.local/codebattle/internal/health"
 )
 
@@ -16,6 +17,21 @@ type healthyDependency struct{ name string }
 
 func (d healthyDependency) Name() string                { return d.name }
 func (d healthyDependency) Check(context.Context) error { return nil }
+
+func TestInvalidProblemClassErrorContract(t *testing.T) {
+	t.Parallel()
+
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/invitations", nil)
+	response := httptest.NewRecorder()
+	duelHandlers{}.writeDuelError(response, request, duels.ErrInvalidProblemClass)
+
+	if response.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusUnprocessableEntity)
+	}
+	if body := response.Body.String(); !bytes.Contains([]byte(body), []byte(`"code":"INVALID_PROBLEM_CLASS"`)) {
+		t.Fatalf("response body = %s", body)
+	}
+}
 
 func TestLiveHealth(t *testing.T) {
 	t.Parallel()

@@ -1,0 +1,11 @@
+{
+  "folders": [
+    {
+      "name": "Code Battle",
+      "path": "."
+    }
+  ],
+  "settings": {
+    "window.title": "Code Battle${separator}${activeEditorShort}"
+  }
+}

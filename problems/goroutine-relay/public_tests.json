@@ -1,0 +1,5 @@
+[
+  {"arguments": [1], "expected": "pingpong"},
+  {"arguments": [3], "expected": "pingpongpingpongpingpong"},
+  {"arguments": [0], "expected": ""}
+]

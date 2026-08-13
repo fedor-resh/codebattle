@@ -1,0 +1,5 @@
+[
+  {"arguments": [[50, 1, 30], 200], "expected": 1},
+  {"arguments": [[20, 30], 2], "expected": -1},
+  {"arguments": [[], 20], "expected": -1}
+]

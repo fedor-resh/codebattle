@@ -6,6 +6,7 @@ import {
   Group,
   Loader,
   Paper,
+  SegmentedControl,
   SimpleGrid,
   Stack,
   Text,
@@ -28,11 +29,13 @@ import {
   heartbeat,
   listUsers,
   type InvitationState,
+  type ProblemClass,
   type User,
 } from '../api/client';
 import { InvitationCountdown } from '../components/InvitationCountdown';
 import { InvitationModal } from '../components/InvitationModal';
 import { UserListItem } from '../components/UserListItem';
+import { problemClassLabel, problemClassOptions } from '../problemClasses';
 
 function showRequestError(error: unknown) {
   notifications.show({
@@ -48,6 +51,7 @@ export function LobbyPage({ currentUser }: { currentUser: User }) {
   const [query, setQuery] = useState('');
   const [debouncedQuery] = useDebouncedValue(query.trim(), 250);
   const [cursor, setCursor] = useState('');
+  const [problemClass, setProblemClass] = useState<ProblemClass>('algorithms');
 
   const usersQuery = useQuery({
     queryKey: ['users', currentUser.id, debouncedQuery, cursor],
@@ -77,7 +81,7 @@ export function LobbyPage({ currentUser }: { currentUser: User }) {
   }, [usersQuery.refetch]);
 
   const createMutation = useMutation({
-    mutationFn: (receiverID: string) => createInvitation(receiverID),
+    mutationFn: (receiverID: string) => createInvitation(receiverID, problemClass),
     onSuccess: (invitation) => {
       queryClient.setQueryData<InvitationState>(['invitation-state', currentUser.id], {
         outgoing: invitation,
@@ -123,6 +127,20 @@ export function LobbyPage({ currentUser }: { currentUser: User }) {
             Приглашение действует 30 секунд. После принятия у обоих игроков откроется одна
             комната.
           </Text>
+          <Stack gap={6} mt="lg" maw={520}>
+            <Text size="sm" fw={700}>Класс задач</Text>
+            <SegmentedControl
+              value={problemClass}
+              onChange={(value) => setProblemClass(value as ProblemClass)}
+              data={problemClassOptions}
+              disabled={hasPendingInvitation || createMutation.isPending}
+              aria-label="Класс задач для дуэли"
+              fullWidth
+            />
+            <Text size="xs" c="dimmed">
+              Выбранный класс действует во всех раундах серии.
+            </Text>
+          </Stack>
         </Paper>
 
         {invitationState?.outgoing && (
@@ -131,6 +149,12 @@ export function LobbyPage({ currentUser }: { currentUser: User }) {
               <Text size="sm">
                 Ожидаем ответ от <b>{invitationState.outgoing.receiver.username}</b>
               </Text>
+              <Badge
+                variant="light"
+                color={invitationState.outgoing.problem_class === 'concurrency' ? 'violet' : 'blue'}
+              >
+                {problemClassLabel[invitationState.outgoing.problem_class]}
+              </Badge>
               <InvitationCountdown expiresAt={invitationState.outgoing.expires_at} />
             </Stack>
           </Alert>

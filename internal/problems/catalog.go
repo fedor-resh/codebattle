@@ -30,14 +30,41 @@ var requiredFiles = []string{
 }
 
 type Metadata struct {
-	Slug          string `yaml:"slug"`
-	Title         string `yaml:"title"`
-	Difficulty    string `yaml:"difficulty"`
-	Function      string `yaml:"function"`
-	Signature     string `yaml:"signature"`
-	Version       int    `yaml:"version"`
-	TimeLimitMS   int    `yaml:"time_limit_ms"`
-	MemoryLimitMB int    `yaml:"memory_limit_mb"`
+	Slug          string       `yaml:"slug"`
+	Title         string       `yaml:"title"`
+	Difficulty    string       `yaml:"difficulty"`
+	Class         Class        `yaml:"class,omitempty"`
+	Requirements  Requirements `yaml:"requirements,omitempty"`
+	Function      string       `yaml:"function"`
+	Signature     string       `yaml:"signature"`
+	Version       int          `yaml:"version"`
+	TimeLimitMS   int          `yaml:"time_limit_ms"`
+	MemoryLimitMB int          `yaml:"memory_limit_mb"`
+}
+
+type Class string
+
+const (
+	ClassAlgorithms  Class = "algorithms"
+	ClassConcurrency Class = "concurrency"
+)
+
+func IsValidClass(value Class) bool {
+	return value == ClassAlgorithms || value == ClassConcurrency
+}
+
+type Requirements struct {
+	Goroutine     bool `yaml:"goroutine,omitempty" json:"goroutine,omitempty"`
+	Channel       bool `yaml:"channel,omitempty" json:"channel,omitempty"`
+	WaitGroup     bool `yaml:"wait_group,omitempty" json:"wait_group,omitempty"`
+	Mutex         bool `yaml:"mutex,omitempty" json:"mutex,omitempty"`
+	Select        bool `yaml:"select,omitempty" json:"select,omitempty"`
+	ContextCancel bool `yaml:"context_cancel,omitempty" json:"context_cancel,omitempty"`
+}
+
+func (requirements Requirements) Empty() bool {
+	return !requirements.Goroutine && !requirements.Channel && !requirements.WaitGroup &&
+		!requirements.Mutex && !requirements.Select && !requirements.ContextCancel
 }
 
 type PublicTest struct {
@@ -136,6 +163,9 @@ func loadProblem(directory, directoryName string) (Problem, error) {
 	if err := decoder.Decode(&metadata); err != nil {
 		return Problem{}, fmt.Errorf("problem %s: decode metadata: %w", directoryName, err)
 	}
+	if metadata.Class == "" {
+		metadata.Class = ClassAlgorithms
+	}
 	if err := validateMetadata(metadata, directoryName); err != nil {
 		return Problem{}, err
 	}
@@ -154,6 +184,9 @@ func loadProblem(directory, directoryName string) (Problem, error) {
 		return Problem{}, fmt.Errorf("problem %s starter: %w", metadata.Slug, err)
 	}
 	if err := ValidateSolution(string(content["reference.go"]), metadata.Signature); err != nil {
+		return Problem{}, fmt.Errorf("problem %s reference: %w", metadata.Slug, err)
+	}
+	if err := ValidateRequirements(string(content["reference.go"]), metadata.Requirements); err != nil {
 		return Problem{}, fmt.Errorf("problem %s reference: %w", metadata.Slug, err)
 	}
 	schema, _ := ParseSignature(metadata.Signature)
@@ -185,6 +218,15 @@ func validateMetadata(metadata Metadata, directoryName string) error {
 	}
 	if metadata.Difficulty != "easy" && metadata.Difficulty != "medium" && metadata.Difficulty != "hard" {
 		return fmt.Errorf("problem %s: invalid difficulty", metadata.Slug)
+	}
+	if !IsValidClass(metadata.Class) {
+		return fmt.Errorf("problem %s: invalid class", metadata.Slug)
+	}
+	if metadata.Class == ClassAlgorithms && !metadata.Requirements.Empty() {
+		return fmt.Errorf("problem %s: algorithm tasks cannot declare concurrency requirements", metadata.Slug)
+	}
+	if metadata.Class == ClassConcurrency && !metadata.Requirements.Goroutine {
+		return fmt.Errorf("problem %s: concurrency tasks must require a goroutine", metadata.Slug)
 	}
 	if metadata.Function != "Solve" {
 		return fmt.Errorf("problem %s: function must be Solve", metadata.Slug)

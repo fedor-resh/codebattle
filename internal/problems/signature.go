@@ -111,6 +111,100 @@ func ValidateSolution(source, expectedSignature string) error {
 	return fmt.Errorf("required function %s was not found", expected.Function)
 }
 
+// ValidateRequirements performs a pedagogical source-level check. Functional
+// tests still verify that the declared concurrency constructs are used
+// correctly and that the solution terminates.
+func ValidateRequirements(source string, requirements Requirements) error {
+	if requirements.Empty() {
+		return nil
+	}
+	file, err := parser.ParseFile(token.NewFileSet(), "solution.go", source, parser.AllErrors)
+	if err != nil {
+		return fmt.Errorf("parse Go source: %w", err)
+	}
+
+	type importInfo struct {
+		alias string
+		dot   bool
+	}
+	imports := make(map[string]importInfo, len(file.Imports))
+	for _, spec := range file.Imports {
+		path, unquoteErr := strconv.Unquote(spec.Path.Value)
+		if unquoteErr != nil {
+			continue
+		}
+		alias := path[strings.LastIndex(path, "/")+1:]
+		info := importInfo{alias: alias}
+		if spec.Name != nil {
+			info.alias = spec.Name.Name
+			info.dot = spec.Name.Name == "."
+		}
+		imports[path] = info
+	}
+
+	var hasGoroutine, hasChannel, hasWaitGroup, hasMutex, hasSelect, hasContextCancel bool
+	ast.Inspect(file, func(node ast.Node) bool {
+		switch value := node.(type) {
+		case *ast.GoStmt:
+			hasGoroutine = true
+		case *ast.ChanType, *ast.SendStmt:
+			hasChannel = true
+		case *ast.UnaryExpr:
+			if value.Op == token.ARROW {
+				hasChannel = true
+			}
+		case *ast.SelectStmt:
+			hasSelect = true
+		case *ast.SelectorExpr:
+			identifier, ok := value.X.(*ast.Ident)
+			if !ok {
+				break
+			}
+			if imported, ok := imports["sync"]; ok && !imported.dot && identifier.Name == imported.alias {
+				hasWaitGroup = hasWaitGroup || value.Sel.Name == "WaitGroup"
+				hasMutex = hasMutex || value.Sel.Name == "Mutex" || value.Sel.Name == "RWMutex"
+			}
+			if imported, ok := imports["context"]; ok && !imported.dot && identifier.Name == imported.alias {
+				hasContextCancel = hasContextCancel || value.Sel.Name == "WithCancel" ||
+					value.Sel.Name == "WithCancelCause"
+			}
+		case *ast.Ident:
+			if imported, ok := imports["sync"]; ok && imported.dot {
+				hasWaitGroup = hasWaitGroup || value.Name == "WaitGroup"
+				hasMutex = hasMutex || value.Name == "Mutex" || value.Name == "RWMutex"
+			}
+			if imported, ok := imports["context"]; ok && imported.dot {
+				hasContextCancel = hasContextCancel || value.Name == "WithCancel" || value.Name == "WithCancelCause"
+			}
+		}
+		return true
+	})
+
+	missing := make([]string, 0, 6)
+	if requirements.Goroutine && !hasGoroutine {
+		missing = append(missing, "goroutine (оператор go)")
+	}
+	if requirements.Channel && !hasChannel {
+		missing = append(missing, "channel")
+	}
+	if requirements.WaitGroup && !hasWaitGroup {
+		missing = append(missing, "sync.WaitGroup")
+	}
+	if requirements.Mutex && !hasMutex {
+		missing = append(missing, "sync.Mutex или sync.RWMutex")
+	}
+	if requirements.Select && !hasSelect {
+		missing = append(missing, "select")
+	}
+	if requirements.ContextCancel && !hasContextCancel {
+		missing = append(missing, "context.WithCancel")
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf("решение должно использовать: %s", strings.Join(missing, ", "))
+	}
+	return nil
+}
+
 func ValidatePublicTests(schema SignatureSchema, tests []PublicTest) error {
 	for testIndex, test := range tests {
 		if len(test.Arguments) != len(schema.Params) {

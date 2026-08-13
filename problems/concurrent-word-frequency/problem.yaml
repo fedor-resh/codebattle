@@ -1,0 +1,13 @@
+slug: concurrent-word-frequency
+title: "Конкурентная частота слов"
+difficulty: medium
+class: concurrency
+requirements:
+  goroutine: true
+  wait_group: true
+  mutex: true
+function: Solve
+signature: "func Solve(words []string, workers int) map[string]int"
+version: 1
+time_limit_ms: 2000
+memory_limit_mb: 256

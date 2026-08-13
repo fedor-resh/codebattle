@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"time"
 
+	"codebattle.local/codebattle/internal/problems"
+
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -53,6 +55,7 @@ func (r *PostgresRepository) ExpirePaused(ctx context.Context, now time.Time) (i
 func (r *PostgresRepository) CreateInvitation(
 	ctx context.Context,
 	id, senderID, receiverID string,
+	problemClass problems.Class,
 	now, expiresAt time.Time,
 ) (Invitation, error) {
 	tx, err := r.pool.Begin(ctx)
@@ -106,20 +109,21 @@ func (r *PostgresRepository) CreateInvitation(
 	}
 
 	if _, err := tx.Exec(ctx, `
-		INSERT INTO invitations (id, sender_id, receiver_id, expires_at, created_at)
-		VALUES ($1, $2, $3, $4, $5)
-	`, id, senderID, receiverID, expiresAt, now); err != nil {
+		INSERT INTO invitations (id, sender_id, receiver_id, problem_class, expires_at, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6)
+	`, id, senderID, receiverID, problemClass, expiresAt, now); err != nil {
 		return Invitation{}, err
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return Invitation{}, err
 	}
 	return Invitation{
-		ID:        id,
-		Sender:    players[senderID].Player,
-		Receiver:  players[receiverID].Player,
-		Status:    "pending",
-		ExpiresAt: expiresAt,
+		ID:           id,
+		Sender:       players[senderID].Player,
+		Receiver:     players[receiverID].Player,
+		Status:       "pending",
+		ProblemClass: problemClass,
+		ExpiresAt:    expiresAt,
 	}, nil
 }
 
@@ -139,7 +143,7 @@ func (r *PostgresRepository) State(ctx context.Context, userID string, now time.
 
 	rows, err := r.pool.Query(ctx, `
 		SELECT i.id, i.sender_id, sender.username, i.receiver_id, receiver.username,
-			i.status, i.expires_at
+			i.status, i.problem_class, i.expires_at
 		FROM invitations i
 		JOIN users sender ON sender.id = i.sender_id
 		JOIN users receiver ON receiver.id = i.receiver_id
@@ -173,10 +177,11 @@ func (r *PostgresRepository) AcceptInvitation(
 	now time.Time,
 ) (Match, error) {
 	var senderID, receiverID string
+	var problemClass problems.Class
 	err := r.pool.QueryRow(ctx,
-		"SELECT sender_id, receiver_id FROM invitations WHERE id = $1",
+		"SELECT sender_id, receiver_id, problem_class FROM invitations WHERE id = $1",
 		invitationID,
-	).Scan(&senderID, &receiverID)
+	).Scan(&senderID, &receiverID, &problemClass)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Match{}, ErrInvitationGone
 	}
@@ -201,8 +206,8 @@ func (r *PostgresRepository) AcceptInvitation(
 	var status string
 	var expiresAt time.Time
 	if err := tx.QueryRow(ctx, `
-		SELECT status, expires_at FROM invitations WHERE id = $1 FOR UPDATE
-	`, invitationID).Scan(&status, &expiresAt); err != nil {
+		SELECT status, problem_class, expires_at FROM invitations WHERE id = $1 FOR UPDATE
+	`, invitationID).Scan(&status, &problemClass, &expiresAt); err != nil {
 		return Match{}, err
 	}
 	if status != "pending" || !expiresAt.After(now) {
@@ -232,12 +237,13 @@ func (r *PostgresRepository) AcceptInvitation(
 	var problemVersionID string
 	if err := tx.QueryRow(ctx, `
 		SELECT id FROM (
-			SELECT DISTINCT ON (slug) id, slug
+			SELECT DISTINCT ON (slug) id, slug, problem_class
 			FROM problem_versions
+			WHERE problem_class = $1
 			ORDER BY slug, version DESC
 		) latest
 		ORDER BY random() LIMIT 1
-	`).Scan(&problemVersionID); errors.Is(err, pgx.ErrNoRows) {
+	`, problemClass).Scan(&problemVersionID); errors.Is(err, pgx.ErrNoRows) {
 		return Match{}, ErrProblemsMissing
 	} else if err != nil {
 		return Match{}, err
@@ -245,10 +251,11 @@ func (r *PostgresRepository) AcceptInvitation(
 
 	if _, err := tx.Exec(ctx, `
 		INSERT INTO matches (
-			id, player_one_id, player_two_id, problem_version_id, problem_history, state, created_at
+			id, player_one_id, player_two_id, problem_class, problem_version_id,
+			problem_history, state, created_at
 		)
-		VALUES ($1, $2, $3, $4, jsonb_build_array($4::text), 'active', $5)
-	`, matchID, senderID, receiverID, problemVersionID, now); err != nil {
+		VALUES ($1, $2, $3, $4, $5, jsonb_build_array($5::text), 'active', $6)
+	`, matchID, senderID, receiverID, problemClass, problemVersionID, now); err != nil {
 		return Match{}, err
 	}
 	if _, err := tx.Exec(ctx, `
@@ -409,14 +416,15 @@ func (r *PostgresRepository) Ready(ctx context.Context, matchID, userID string, 
 	defer func() { _ = tx.Rollback(ctx) }()
 
 	var playerOneID, playerTwoID, state, currentProblemID string
+	var problemClass problems.Class
 	var playerOneReady, playerTwoReady bool
 	var history []byte
 	err = tx.QueryRow(ctx, `
-		SELECT player_one_id, player_two_id, state, problem_version_id,
+		SELECT player_one_id, player_two_id, state, problem_class, problem_version_id,
 			player_one_ready, player_two_ready, problem_history
 		FROM matches WHERE id = $1 FOR UPDATE
 	`, matchID).Scan(
-		&playerOneID, &playerTwoID, &state, &currentProblemID,
+		&playerOneID, &playerTwoID, &state, &problemClass, &currentProblemID,
 		&playerOneReady, &playerTwoReady, &history,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -447,6 +455,7 @@ func (r *PostgresRepository) Ready(ctx context.Context, matchID, userID string, 
 			WITH latest AS (
 				SELECT DISTINCT ON (slug) id, slug
 				FROM problem_versions
+				WHERE problem_class = $2
 				ORDER BY slug, version DESC
 			), seen_slugs AS (
 				SELECT slug FROM problem_versions
@@ -455,7 +464,7 @@ func (r *PostgresRepository) Ready(ctx context.Context, matchID, userID string, 
 			SELECT id FROM latest
 			WHERE slug NOT IN (SELECT slug FROM seen_slugs)
 			ORDER BY random() LIMIT 1
-		`, history).Scan(&nextProblemID)
+		`, history, problemClass).Scan(&nextProblemID)
 		resetHistory := false
 		if errors.Is(err, pgx.ErrNoRows) {
 			resetHistory = true
@@ -463,11 +472,12 @@ func (r *PostgresRepository) Ready(ctx context.Context, matchID, userID string, 
 				SELECT id FROM (
 					SELECT DISTINCT ON (slug) id, slug
 					FROM problem_versions
+					WHERE problem_class = $2
 					ORDER BY slug, version DESC
 				) latest
 				WHERE slug <> (SELECT slug FROM problem_versions WHERE id = $1)
 				ORDER BY random() LIMIT 1
-			`, currentProblemID).Scan(&nextProblemID)
+			`, currentProblemID, problemClass).Scan(&nextProblemID)
 		}
 		if err != nil {
 			return Match{}, ErrProblemsMissing
@@ -539,9 +549,11 @@ const matchQuery = `
 	SELECT m.id,
 		m.player_one_id, player_one.username,
 		m.player_two_id, player_two.username,
-		m.player_one_score, m.player_two_score, m.state,
+		m.player_one_score, m.player_two_score, m.state, m.problem_class,
 		COALESCE(problem.id, ''), COALESCE(problem.slug, ''), COALESCE(problem.title, ''),
-		COALESCE(problem.difficulty, ''), COALESCE(problem.statement_markdown, ''),
+		COALESCE(problem.difficulty, ''), COALESCE(problem.problem_class, 'algorithms'),
+		COALESCE(problem.requirements, '{}'::jsonb)::text,
+		COALESCE(problem.statement_markdown, ''),
 		COALESCE(problem.function_signature, ''), COALESCE(problem.starter_code, ''),
 		COALESCE(problem.public_tests, '[]'::jsonb)::text,
 		COALESCE(problem.time_limit_ms, 0), COALESCE(problem.memory_limit_mb, 0),
@@ -573,13 +585,15 @@ func scanMatch(row rowScanner) (Match, error) {
 	var match Match
 	var problem Problem
 	var publicTests string
+	var requirements string
 	var codeSnapshots string
 	err := row.Scan(
 		&match.ID,
 		&match.PlayerOne.ID, &match.PlayerOne.Username,
 		&match.PlayerTwo.ID, &match.PlayerTwo.Username,
-		&match.PlayerOneScore, &match.PlayerTwoScore, &match.State,
+		&match.PlayerOneScore, &match.PlayerTwoScore, &match.State, &match.ProblemClass,
 		&problem.ID, &problem.Slug, &problem.Title, &problem.Difficulty,
+		&problem.ProblemClass, &requirements,
 		&problem.Statement, &problem.FunctionSignature, &problem.StarterCode,
 		&publicTests, &problem.TimeLimitMS, &problem.MemoryLimitMB,
 		&match.RoundNumber, &match.RoundWinnerID,
@@ -595,6 +609,9 @@ func scanMatch(row rowScanner) (Match, error) {
 	}
 	if problem.ID != "" {
 		problem.PublicTests = []byte(publicTests)
+		if err := json.Unmarshal([]byte(requirements), &problem.Requirements); err != nil {
+			return Match{}, err
+		}
 		match.Problem = &problem
 	}
 	if err := json.Unmarshal([]byte(codeSnapshots), &match.CodeSnapshots); err != nil {
@@ -609,7 +626,7 @@ func scanInvitation(row rowScanner) (Invitation, error) {
 		&invitation.ID,
 		&invitation.Sender.ID, &invitation.Sender.Username,
 		&invitation.Receiver.ID, &invitation.Receiver.Username,
-		&invitation.Status, &invitation.ExpiresAt,
+		&invitation.Status, &invitation.ProblemClass, &invitation.ExpiresAt,
 	)
 	if err != nil {
 		return Invitation{}, fmt.Errorf("scan invitation: %w", err)

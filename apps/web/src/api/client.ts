@@ -11,11 +11,14 @@ export type UserPage = {
   next_cursor?: string;
 };
 
+export type ProblemClass = 'algorithms' | 'concurrency';
+
 export type Invitation = {
   id: string;
   sender: Pick<User, 'id' | 'username'>;
   receiver: Pick<User, 'id' | 'username'>;
   status: 'pending' | 'accepted' | 'declined' | 'expired';
+  problem_class: ProblemClass;
   expires_at: string;
 };
 
@@ -26,6 +29,7 @@ export type Match = {
   player_one_score: number;
   player_two_score: number;
   state: 'active' | 'waiting_ready' | 'paused' | 'ended';
+  problem_class: ProblemClass;
   problem?: Problem;
   round_number: number;
   round_winner_id?: string;
@@ -50,6 +54,15 @@ export type Problem = {
   slug: string;
   title: string;
   difficulty: 'easy' | 'medium' | 'hard';
+  problem_class: ProblemClass;
+  requirements: {
+    goroutine?: boolean;
+    channel?: boolean;
+    wait_group?: boolean;
+    mutex?: boolean;
+    select?: boolean;
+    context_cancel?: boolean;
+  };
   statement_markdown: string;
   function_signature: string;
   starter_code: string;
@@ -186,11 +199,14 @@ export function listUsers(query: string, cursor: string): Promise<UserPage> {
   return request<UserPage>(`/api/v1/users?${params}`);
 }
 
-export async function createInvitation(receiverId: string): Promise<Invitation> {
+export async function createInvitation(
+  receiverId: string,
+  problemClass: ProblemClass = 'algorithms',
+): Promise<Invitation> {
   return (
     await request<{ invitation: Invitation }>('/api/v1/invitations', {
       method: 'POST',
-      body: JSON.stringify({ receiver_id: receiverId }),
+      body: JSON.stringify({ receiver_id: receiverId, problem_class: problemClass }),
     })
   ).invitation;
 }

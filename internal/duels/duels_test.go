@@ -5,27 +5,32 @@ import (
 	"errors"
 	"testing"
 	"time"
+
+	"codebattle.local/codebattle/internal/problems"
 )
 
 type repositoryStub struct {
-	createdID         string
-	createdSenderID   string
-	createdReceiverID string
-	createdAt         time.Time
-	expiresAt         time.Time
-	updatedRevision   int64
-	updatedCursorLine int
-	updatedCursorCol  int
+	createdID           string
+	createdSenderID     string
+	createdReceiverID   string
+	createdProblemClass problems.Class
+	createdAt           time.Time
+	expiresAt           time.Time
+	updatedRevision     int64
+	updatedCursorLine   int
+	updatedCursorCol    int
 }
 
 func (r *repositoryStub) CreateInvitation(
 	_ context.Context,
 	id, senderID, receiverID string,
+	problemClass problems.Class,
 	createdAt, expiresAt time.Time,
 ) (Invitation, error) {
 	r.createdID = id
 	r.createdSenderID = senderID
 	r.createdReceiverID = receiverID
+	r.createdProblemClass = problemClass
 	r.createdAt = createdAt
 	r.expiresAt = expiresAt
 	return Invitation{ID: id, ExpiresAt: expiresAt}, nil
@@ -74,7 +79,9 @@ func TestCreateInvitationUsesThirtySecondTTL(t *testing.T) {
 	now := time.Date(2026, 8, 8, 10, 0, 0, 0, time.UTC)
 	service.now = func() time.Time { return now }
 
-	invitation, err := service.CreateInvitation(context.Background(), "sender", "receiver")
+	invitation, err := service.CreateInvitation(
+		context.Background(), "sender", "receiver", problems.ClassConcurrency,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,6 +91,9 @@ func TestCreateInvitationUsesThirtySecondTTL(t *testing.T) {
 	if repository.createdSenderID != "sender" || repository.createdReceiverID != "receiver" {
 		t.Fatalf("players = %q -> %q", repository.createdSenderID, repository.createdReceiverID)
 	}
+	if repository.createdProblemClass != problems.ClassConcurrency {
+		t.Fatalf("problem class = %q", repository.createdProblemClass)
+	}
 	if got := repository.expiresAt.Sub(repository.createdAt); got != 30*time.Second {
 		t.Fatalf("TTL = %s, want 30s", got)
 	}
@@ -91,9 +101,31 @@ func TestCreateInvitationUsesThirtySecondTTL(t *testing.T) {
 
 func TestCreateInvitationRejectsSelf(t *testing.T) {
 	service := NewService(&repositoryStub{})
-	_, err := service.CreateInvitation(context.Background(), "same-user", "same-user")
+	_, err := service.CreateInvitation(
+		context.Background(), "same-user", "same-user", problems.ClassAlgorithms,
+	)
 	if !errors.Is(err, ErrSelfInvitation) {
 		t.Fatalf("error = %v, want ErrSelfInvitation", err)
+	}
+}
+
+func TestCreateInvitationDefaultsToAlgorithms(t *testing.T) {
+	repository := &repositoryStub{}
+	service := NewService(repository)
+
+	if _, err := service.CreateInvitation(context.Background(), "sender", "receiver", ""); err != nil {
+		t.Fatal(err)
+	}
+	if repository.createdProblemClass != problems.ClassAlgorithms {
+		t.Fatalf("problem class = %q", repository.createdProblemClass)
+	}
+}
+
+func TestCreateInvitationRejectsInvalidProblemClass(t *testing.T) {
+	service := NewService(&repositoryStub{})
+	_, err := service.CreateInvitation(context.Background(), "sender", "receiver", "unknown")
+	if !errors.Is(err, ErrInvalidProblemClass) {
+		t.Fatalf("error = %v, want ErrInvalidProblemClass", err)
 	}
 }
 

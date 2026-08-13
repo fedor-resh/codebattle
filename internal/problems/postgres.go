@@ -2,6 +2,7 @@ package problems
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -36,16 +37,23 @@ func Seed(ctx context.Context, pool *pgxpool.Pool, catalog []Problem) (SeedResul
 		if err != nil {
 			return result, err
 		}
+		requirements, err := json.Marshal(problem.Requirements)
+		if err != nil {
+			_ = tx.Rollback(ctx)
+			return result, fmt.Errorf("encode requirements for problem %s: %w", problem.Slug, err)
+		}
 		_, err = tx.Exec(ctx, `
 			INSERT INTO problem_versions (
-				id, slug, version, title, difficulty, function_name, function_signature,
+				id, slug, version, title, difficulty, problem_class, requirements,
+				function_name, function_signature,
 				statement_markdown, starter_code, public_tests, time_limit_ms,
 				memory_limit_mb, content_hash
-			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 		`,
 			problem.ID, problem.Slug, problem.Version, problem.Title, problem.Difficulty,
-			problem.Function, problem.Signature, problem.Statement, problem.Starter,
-			problem.PublicTestRaw, problem.TimeLimitMS, problem.MemoryLimitMB, problem.ContentHash,
+			problem.Class, requirements, problem.Function, problem.Signature, problem.Statement,
+			problem.Starter, problem.PublicTestRaw, problem.TimeLimitMS, problem.MemoryLimitMB,
+			problem.ContentHash,
 		)
 		if err == nil {
 			_, err = tx.Exec(ctx, `
