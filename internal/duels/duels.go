@@ -25,6 +25,7 @@ var (
 	ErrSourceTooLarge      = errors.New("source is too large")
 	ErrInvalidCursor       = errors.New("invalid editor cursor")
 	ErrInvalidProblemClass = errors.New("invalid problem class")
+	ErrInvalidDifficulty   = errors.New("invalid difficulty")
 )
 
 const invitationTTL = 30 * time.Second
@@ -40,6 +41,7 @@ type Invitation struct {
 	Receiver     Player         `json:"receiver"`
 	Status       string         `json:"status"`
 	ProblemClass problems.Class `json:"problem_class"`
+	Difficulty   string         `json:"difficulty,omitempty"`
 	ExpiresAt    time.Time      `json:"expires_at"`
 }
 
@@ -51,6 +53,7 @@ type Match struct {
 	PlayerTwoScore int            `json:"player_two_score"`
 	State          string         `json:"state"`
 	ProblemClass   problems.Class `json:"problem_class"`
+	Difficulty     string         `json:"difficulty,omitempty"`
 	Problem        *Problem       `json:"problem,omitempty"`
 	RoundNumber    int            `json:"round_number"`
 	RoundWinnerID  string         `json:"round_winner_id,omitempty"`
@@ -93,8 +96,14 @@ type State struct {
 	Match    *Match      `json:"match,omitempty"`
 }
 
+type ProblemOption struct {
+	ProblemClass problems.Class `json:"problem_class"`
+	Difficulty   string         `json:"difficulty"`
+	Count        int            `json:"count"`
+}
+
 type Repository interface {
-	CreateInvitation(context.Context, string, string, string, problems.Class, time.Time, time.Time) (Invitation, error)
+	CreateInvitation(context.Context, string, string, string, problems.Class, string, time.Time, time.Time) (Invitation, error)
 	State(context.Context, string, time.Time) (State, error)
 	AcceptInvitation(context.Context, string, string, string, time.Time) (Match, error)
 	DeclineInvitation(context.Context, string, string, time.Time) error
@@ -103,6 +112,7 @@ type Repository interface {
 	UpdateCode(context.Context, string, string, string, int64, int, int, time.Time) error
 	Ready(context.Context, string, string, time.Time) (Match, error)
 	Skip(context.Context, string, string, time.Time) (Match, error)
+	ProblemOptions(context.Context) ([]ProblemOption, error)
 }
 
 type Service struct {
@@ -118,6 +128,7 @@ func (s *Service) CreateInvitation(
 	ctx context.Context,
 	senderID, receiverID string,
 	problemClass problems.Class,
+	difficulty string,
 ) (Invitation, error) {
 	if senderID == receiverID {
 		return Invitation{}, ErrSelfInvitation
@@ -128,10 +139,17 @@ func (s *Service) CreateInvitation(
 	if !problems.IsValidClass(problemClass) {
 		return Invitation{}, ErrInvalidProblemClass
 	}
+	if difficulty != "" && !problems.IsValidDifficulty(difficulty) {
+		return Invitation{}, ErrInvalidDifficulty
+	}
 	now := s.now().UTC()
 	return s.repository.CreateInvitation(
-		ctx, randomID(), senderID, receiverID, problemClass, now, now.Add(invitationTTL),
+		ctx, randomID(), senderID, receiverID, problemClass, difficulty, now, now.Add(invitationTTL),
 	)
+}
+
+func (s *Service) ProblemOptions(ctx context.Context) ([]ProblemOption, error) {
+	return s.repository.ProblemOptions(ctx)
 }
 
 func (s *Service) State(ctx context.Context, userID string) (State, error) {

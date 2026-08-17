@@ -1,0 +1,9 @@
+slug: lookup-wrapped
+title: "Обёрнутая ошибка"
+difficulty: easy
+class: oop
+function: Solve
+signature: "func Solve(scores map[string]int, names []string) []string"
+version: 1
+time_limit_ms: 2000
+memory_limit_mb: 256

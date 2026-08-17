@@ -34,6 +34,21 @@ func TestInvalidProblemClassErrorContract(t *testing.T) {
 	}
 }
 
+func TestInvalidDifficultyErrorContract(t *testing.T) {
+	t.Parallel()
+
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/invitations", nil)
+	response := httptest.NewRecorder()
+	duelHandlers{}.writeDuelError(response, request, duels.ErrInvalidDifficulty)
+
+	if response.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusUnprocessableEntity)
+	}
+	if body := response.Body.String(); !bytes.Contains([]byte(body), []byte(`"code":"INVALID_DIFFICULTY"`)) {
+		t.Fatalf("response body = %s", body)
+	}
+}
+
 func TestPracticeSessionNotFoundErrorContract(t *testing.T) {
 	t.Parallel()
 

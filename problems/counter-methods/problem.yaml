@@ -1,0 +1,9 @@
+slug: counter-methods
+title: "Счётчик с методами"
+difficulty: easy
+class: oop
+function: Solve
+signature: "func Solve(commands []string) []int"
+version: 1
+time_limit_ms: 2000
+memory_limit_mb: 256

@@ -1,0 +1,9 @@
+slug: stringer-temperature
+title: "Свой String()"
+difficulty: easy
+class: oop
+function: Solve
+signature: "func Solve(values []int) []string"
+version: 1
+time_limit_ms: 2000
+memory_limit_mb: 256

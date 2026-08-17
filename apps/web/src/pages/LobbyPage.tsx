@@ -17,7 +17,7 @@ import { useDebouncedValue } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { IconAlertCircle, IconSearch, IconSwords, IconTarget } from '@tabler/icons-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import {
@@ -27,7 +27,9 @@ import {
   declineInvitation,
   getInvitationState,
   heartbeat,
+  listDuelOptions,
   listUsers,
+  type Difficulty,
   type InvitationState,
   type ProblemClass,
   type User,
@@ -35,6 +37,7 @@ import {
 import { InvitationCountdown } from '../components/InvitationCountdown';
 import { InvitationModal } from '../components/InvitationModal';
 import { UserListItem } from '../components/UserListItem';
+import { difficulties, difficultyColor, difficultyLabel } from '../difficulties';
 import { problemClassColor, problemClassLabel, problemClassOptions } from '../problemClasses';
 
 function showRequestError(error: unknown) {
@@ -52,6 +55,7 @@ export function LobbyPage({ currentUser }: { currentUser: User }) {
   const [debouncedQuery] = useDebouncedValue(query.trim(), 250);
   const [cursor, setCursor] = useState('');
   const [problemClass, setProblemClass] = useState<ProblemClass>('algorithms');
+  const [difficulty, setDifficulty] = useState<Difficulty | 'any'>('any');
 
   const usersQuery = useQuery({
     queryKey: ['users', currentUser.id, debouncedQuery, cursor],
@@ -63,6 +67,29 @@ export function LobbyPage({ currentUser }: { currentUser: User }) {
     queryFn: getInvitationState,
     refetchInterval: 2_000,
   });
+  const optionsQuery = useQuery({
+    queryKey: ['duel-options', currentUser.id],
+    queryFn: listDuelOptions,
+  });
+
+  const availableDifficulties = useMemo(() => {
+    const values = new Set<Difficulty>();
+    for (const option of optionsQuery.data ?? []) {
+      if (option.problem_class === problemClass) {
+        values.add(option.difficulty);
+      }
+    }
+    return values;
+  }, [optionsQuery.data, problemClass]);
+
+  useEffect(() => {
+    if (!optionsQuery.isSuccess || difficulty === 'any') {
+      return;
+    }
+    if (!availableDifficulties.has(difficulty)) {
+      setDifficulty('any');
+    }
+  }, [availableDifficulties, difficulty, optionsQuery.isSuccess]);
 
   useEffect(() => setCursor(''), [debouncedQuery]);
 
@@ -81,7 +108,12 @@ export function LobbyPage({ currentUser }: { currentUser: User }) {
   }, [usersQuery.refetch]);
 
   const createMutation = useMutation({
-    mutationFn: (receiverID: string) => createInvitation(receiverID, problemClass),
+    mutationFn: (receiverID: string) =>
+      createInvitation(
+        receiverID,
+        problemClass,
+        difficulty === 'any' ? undefined : difficulty,
+      ),
     onSuccess: (invitation) => {
       queryClient.setQueryData<InvitationState>(['invitation-state', currentUser.id], {
         outgoing: invitation,
@@ -137,8 +169,24 @@ export function LobbyPage({ currentUser }: { currentUser: User }) {
               aria-label="Класс задач для дуэли"
               fullWidth
             />
+            <Text size="sm" fw={700} mt="xs">Сложность</Text>
+            <SegmentedControl
+              value={difficulty}
+              onChange={(value) => setDifficulty(value as Difficulty | 'any')}
+              data={[
+                { label: 'Любая', value: 'any' },
+                ...difficulties.map((value) => ({
+                  label: difficultyLabel[value],
+                  value,
+                  disabled: optionsQuery.isSuccess && !availableDifficulties.has(value),
+                })),
+              ]}
+              disabled={hasPendingInvitation || createMutation.isPending}
+              aria-label="Сложность задач для дуэли"
+              fullWidth
+            />
             <Text size="xs" c="dimmed">
-              Выбранный класс действует во всех раундах серии.
+              Выбранный класс и сложность действуют во всех раундах серии. Сложность можно не выбирать.
             </Text>
             <Button
               mt="sm"
@@ -157,12 +205,22 @@ export function LobbyPage({ currentUser }: { currentUser: User }) {
               <Text size="sm">
                 Ожидаем ответ от <b>{invitationState.outgoing.receiver.username}</b>
               </Text>
-              <Badge
-                variant="light"
-                color={problemClassColor[invitationState.outgoing.problem_class]}
-              >
-                {problemClassLabel[invitationState.outgoing.problem_class]}
-              </Badge>
+              <Group gap="xs">
+                <Badge
+                  variant="light"
+                  color={problemClassColor[invitationState.outgoing.problem_class]}
+                >
+                  {problemClassLabel[invitationState.outgoing.problem_class]}
+                </Badge>
+                {invitationState.outgoing.difficulty && (
+                  <Badge
+                    variant="light"
+                    color={difficultyColor[invitationState.outgoing.difficulty]}
+                  >
+                    {difficultyLabel[invitationState.outgoing.difficulty]}
+                  </Badge>
+                )}
+              </Group>
               <InvitationCountdown expiresAt={invitationState.outgoing.expires_at} />
             </Stack>
           </Alert>

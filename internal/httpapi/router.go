@@ -76,6 +76,7 @@ func NewHandler(logger *slog.Logger, checker *health.Checker, environment string
 			duelRoutes := duelHandlers{accounts: handlers, service: deps.Duels}
 			mux.Handle("POST /api/v1/invitations", limiter.wrap(20, time.Minute, http.HandlerFunc(duelRoutes.createInvitation)))
 			mux.HandleFunc("GET /api/v1/invitations", duelRoutes.invitationState)
+			mux.HandleFunc("GET /api/v1/duel-options", duelRoutes.duelOptions)
 			mux.HandleFunc("POST /api/v1/invitations/{id}/accept", duelRoutes.acceptInvitation)
 			mux.HandleFunc("POST /api/v1/invitations/{id}/decline", duelRoutes.declineInvitation)
 			mux.HandleFunc("GET /api/v1/matches/{id}", duelRoutes.match)

@@ -54,6 +54,16 @@ func IsValidClass(value Class) bool {
 	return value == ClassAlgorithms || value == ClassConcurrency || value == ClassOOP
 }
 
+const (
+	DifficultyEasy   = "easy"
+	DifficultyMedium = "medium"
+	DifficultyHard   = "hard"
+)
+
+func IsValidDifficulty(value string) bool {
+	return value == DifficultyEasy || value == DifficultyMedium || value == DifficultyHard
+}
+
 type Requirements struct {
 	Goroutine     bool `yaml:"goroutine,omitempty" json:"goroutine,omitempty"`
 	Channel       bool `yaml:"channel,omitempty" json:"channel,omitempty"`
@@ -214,7 +224,7 @@ func validateMetadata(metadata Metadata, directoryName string) error {
 	if strings.TrimSpace(metadata.Title) == "" {
 		return fmt.Errorf("problem %s: title is empty", metadata.Slug)
 	}
-	if metadata.Difficulty != "easy" && metadata.Difficulty != "medium" && metadata.Difficulty != "hard" {
+	if !IsValidDifficulty(metadata.Difficulty) {
 		return fmt.Errorf("problem %s: invalid difficulty", metadata.Slug)
 	}
 	if !IsValidClass(metadata.Class) {

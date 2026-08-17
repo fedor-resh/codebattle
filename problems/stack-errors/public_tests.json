@@ -1,0 +1,5 @@
+[
+  {"arguments": [["push 1", "push 2", "pop", "pop", "pop"]], "expected": ["ok", "ok", "2", "1", "empty stack"]},
+  {"arguments": [["pop", "push 7", "pop"]], "expected": ["empty stack", "ok", "7"]},
+  {"arguments": [[]], "expected": []}
+]

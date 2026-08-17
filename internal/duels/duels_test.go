@@ -14,6 +14,7 @@ type repositoryStub struct {
 	createdSenderID     string
 	createdReceiverID   string
 	createdProblemClass problems.Class
+	createdDifficulty   string
 	createdAt           time.Time
 	expiresAt           time.Time
 	updatedRevision     int64
@@ -25,12 +26,14 @@ func (r *repositoryStub) CreateInvitation(
 	_ context.Context,
 	id, senderID, receiverID string,
 	problemClass problems.Class,
+	difficulty string,
 	createdAt, expiresAt time.Time,
 ) (Invitation, error) {
 	r.createdID = id
 	r.createdSenderID = senderID
 	r.createdReceiverID = receiverID
 	r.createdProblemClass = problemClass
+	r.createdDifficulty = difficulty
 	r.createdAt = createdAt
 	r.expiresAt = expiresAt
 	return Invitation{ID: id, ExpiresAt: expiresAt}, nil
@@ -77,6 +80,10 @@ func (*repositoryStub) Skip(context.Context, string, string, time.Time) (Match, 
 	return Match{}, nil
 }
 
+func (*repositoryStub) ProblemOptions(context.Context) ([]ProblemOption, error) {
+	return nil, nil
+}
+
 func TestCreateInvitationUsesThirtySecondTTL(t *testing.T) {
 	repository := &repositoryStub{}
 	service := NewService(repository)
@@ -84,7 +91,7 @@ func TestCreateInvitationUsesThirtySecondTTL(t *testing.T) {
 	service.now = func() time.Time { return now }
 
 	invitation, err := service.CreateInvitation(
-		context.Background(), "sender", "receiver", problems.ClassConcurrency,
+		context.Background(), "sender", "receiver", problems.ClassConcurrency, "",
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -106,7 +113,7 @@ func TestCreateInvitationUsesThirtySecondTTL(t *testing.T) {
 func TestCreateInvitationRejectsSelf(t *testing.T) {
 	service := NewService(&repositoryStub{})
 	_, err := service.CreateInvitation(
-		context.Background(), "same-user", "same-user", problems.ClassAlgorithms,
+		context.Background(), "same-user", "same-user", problems.ClassAlgorithms, "",
 	)
 	if !errors.Is(err, ErrSelfInvitation) {
 		t.Fatalf("error = %v, want ErrSelfInvitation", err)
@@ -117,7 +124,7 @@ func TestCreateInvitationDefaultsToAlgorithms(t *testing.T) {
 	repository := &repositoryStub{}
 	service := NewService(repository)
 
-	if _, err := service.CreateInvitation(context.Background(), "sender", "receiver", ""); err != nil {
+	if _, err := service.CreateInvitation(context.Background(), "sender", "receiver", "", ""); err != nil {
 		t.Fatal(err)
 	}
 	if repository.createdProblemClass != problems.ClassAlgorithms {
@@ -127,9 +134,33 @@ func TestCreateInvitationDefaultsToAlgorithms(t *testing.T) {
 
 func TestCreateInvitationRejectsInvalidProblemClass(t *testing.T) {
 	service := NewService(&repositoryStub{})
-	_, err := service.CreateInvitation(context.Background(), "sender", "receiver", "unknown")
+	_, err := service.CreateInvitation(context.Background(), "sender", "receiver", "unknown", "")
 	if !errors.Is(err, ErrInvalidProblemClass) {
 		t.Fatalf("error = %v, want ErrInvalidProblemClass", err)
+	}
+}
+
+func TestCreateInvitationRejectsInvalidDifficulty(t *testing.T) {
+	service := NewService(&repositoryStub{})
+	_, err := service.CreateInvitation(
+		context.Background(), "sender", "receiver", problems.ClassAlgorithms, "nightmare",
+	)
+	if !errors.Is(err, ErrInvalidDifficulty) {
+		t.Fatalf("error = %v, want ErrInvalidDifficulty", err)
+	}
+}
+
+func TestCreateInvitationStoresDifficulty(t *testing.T) {
+	repository := &repositoryStub{}
+	service := NewService(repository)
+
+	if _, err := service.CreateInvitation(
+		context.Background(), "sender", "receiver", problems.ClassOOP, problems.DifficultyEasy,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if repository.createdDifficulty != problems.DifficultyEasy {
+		t.Fatalf("difficulty = %q", repository.createdDifficulty)
 	}
 }
 

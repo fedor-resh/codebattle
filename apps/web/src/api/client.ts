@@ -13,12 +13,15 @@ export type UserPage = {
 
 export type ProblemClass = 'algorithms' | 'concurrency' | 'oop';
 
+export type Difficulty = 'easy' | 'medium' | 'hard';
+
 export type Invitation = {
   id: string;
   sender: Pick<User, 'id' | 'username'>;
   receiver: Pick<User, 'id' | 'username'>;
   status: 'pending' | 'accepted' | 'declined' | 'expired';
   problem_class: ProblemClass;
+  difficulty?: Difficulty;
   expires_at: string;
 };
 
@@ -30,6 +33,7 @@ export type Match = {
   player_two_score: number;
   state: 'active' | 'waiting_ready' | 'paused' | 'ended';
   problem_class: ProblemClass;
+  difficulty?: Difficulty;
   problem?: Problem;
   round_number: number;
   round_winner_id?: string;
@@ -55,7 +59,7 @@ export type Problem = {
   id: string;
   slug: string;
   title: string;
-  difficulty: 'easy' | 'medium' | 'hard';
+  difficulty: Difficulty;
   problem_class: ProblemClass;
   requirements: {
     goroutine?: boolean;
@@ -204,13 +208,28 @@ export function listUsers(query: string, cursor: string): Promise<UserPage> {
 export async function createInvitation(
   receiverId: string,
   problemClass: ProblemClass = 'algorithms',
+  difficulty?: Difficulty,
 ): Promise<Invitation> {
   return (
     await request<{ invitation: Invitation }>('/api/v1/invitations', {
       method: 'POST',
-      body: JSON.stringify({ receiver_id: receiverId, problem_class: problemClass }),
+      body: JSON.stringify({
+        receiver_id: receiverId,
+        problem_class: problemClass,
+        ...(difficulty ? { difficulty } : {}),
+      }),
     })
   ).invitation;
+}
+
+export type DuelOption = {
+  problem_class: ProblemClass;
+  difficulty: Difficulty;
+  count: number;
+};
+
+export async function listDuelOptions(): Promise<DuelOption[]> {
+  return (await request<{ options: DuelOption[] }>('/api/v1/duel-options')).options;
 }
 
 export function getInvitationState(): Promise<InvitationState> {

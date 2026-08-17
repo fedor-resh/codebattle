@@ -23,6 +23,16 @@ vi.mock('../api/client', async (importOriginal) => {
     }),
     heartbeat: vi.fn().mockResolvedValue(undefined),
     getInvitationState: vi.fn().mockResolvedValue({}),
+    listDuelOptions: vi.fn().mockResolvedValue([
+      { problem_class: 'algorithms', difficulty: 'easy', count: 15 },
+      { problem_class: 'algorithms', difficulty: 'medium', count: 10 },
+      { problem_class: 'concurrency', difficulty: 'easy', count: 2 },
+      { problem_class: 'concurrency', difficulty: 'medium', count: 3 },
+      { problem_class: 'concurrency', difficulty: 'hard', count: 2 },
+      { problem_class: 'oop', difficulty: 'easy', count: 4 },
+      { problem_class: 'oop', difficulty: 'medium', count: 9 },
+      { problem_class: 'oop', difficulty: 'hard', count: 1 },
+    ]),
     createInvitation: vi.fn().mockResolvedValue({
       id: 'invitation-1',
       sender: { id: 'current-user', username: 'algo_fox' },
@@ -65,9 +75,13 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Пригласить go_ninja' }));
 
     await waitFor(() => {
-      expect(createInvitation).toHaveBeenCalledWith('opponent', 'concurrency');
+      expect(createInvitation).toHaveBeenCalledWith('opponent', 'concurrency', undefined);
     });
     expect(screen.getByLabelText('Класс задач для дуэли')).toHaveAttribute(
+      'data-disabled',
+      'true',
+    );
+    expect(screen.getByLabelText('Сложность задач для дуэли')).toHaveAttribute(
       'data-disabled',
       'true',
     );

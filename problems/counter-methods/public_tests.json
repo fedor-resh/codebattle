@@ -1,0 +1,5 @@
+[
+  {"arguments": [["inc", "add 5", "inc"]], "expected": [1, 6, 7]},
+  {"arguments": [["add -3", "inc", "add 0"]], "expected": [-3, -2, -2]},
+  {"arguments": [[]], "expected": []}
+]

@@ -1,0 +1,5 @@
+[
+  {"arguments": [{"Ann": 10, "Bob": 7}, ["Ann", "Cara", "Bob"]], "expected": ["10", "player Cara: not found", "7"]},
+  {"arguments": [{}, ["Ada"]], "expected": ["player Ada: not found"]},
+  {"arguments": [{"Ada": 0}, ["Ada"]], "expected": ["0"]}
+]

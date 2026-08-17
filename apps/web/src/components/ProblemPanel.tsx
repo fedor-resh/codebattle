@@ -1,9 +1,7 @@
 import { Accordion, Badge, Code, Group, Paper, ScrollArea, Stack, Text, Title } from '@mantine/core';
 
 import type { Problem } from '../api/client';
-
-const difficultyLabel = { easy: 'Простая', medium: 'Средняя', hard: 'Сложная' };
-const difficultyColor = { easy: 'green', medium: 'yellow', hard: 'red' };
+import { difficultyColor, difficultyLabel } from '../difficulties';
 const requirementLabel = {
   goroutine: 'goroutine',
   channel: 'channel',

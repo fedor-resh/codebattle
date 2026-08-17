@@ -16,6 +16,7 @@ type duelHandlers struct {
 type createInvitationRequest struct {
 	ReceiverID   string         `json:"receiver_id"`
 	ProblemClass problems.Class `json:"problem_class"`
+	Difficulty   string         `json:"difficulty"`
 }
 
 type updateCodeRequest struct {
@@ -36,7 +37,7 @@ func (h duelHandlers) createInvitation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	invitation, err := h.service.CreateInvitation(
-		r.Context(), user.ID, input.ReceiverID, input.ProblemClass,
+		r.Context(), user.ID, input.ReceiverID, input.ProblemClass, input.Difficulty,
 	)
 	if err != nil {
 		h.writeDuelError(w, r, err)
@@ -148,6 +149,18 @@ func (h duelHandlers) ready(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"match": match})
 }
 
+func (h duelHandlers) duelOptions(w http.ResponseWriter, r *http.Request) {
+	if _, ok := h.accounts.authenticate(w, r); !ok {
+		return
+	}
+	options, err := h.service.ProblemOptions(r.Context())
+	if err != nil {
+		h.writeDuelError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"options": options})
+}
+
 func (h duelHandlers) skip(w http.ResponseWriter, r *http.Request) {
 	user, ok := h.accounts.authenticate(w, r)
 	if !ok {
@@ -189,6 +202,8 @@ func (h duelHandlers) writeDuelError(w http.ResponseWriter, r *http.Request, err
 		writeError(w, r, http.StatusBadRequest, "INVALID_CURSOR", "Некорректная позиция курсора", nil)
 	case errors.Is(err, duels.ErrInvalidProblemClass):
 		writeError(w, r, http.StatusUnprocessableEntity, "INVALID_PROBLEM_CLASS", "Неизвестный класс задач", nil)
+	case errors.Is(err, duels.ErrInvalidDifficulty):
+		writeError(w, r, http.StatusUnprocessableEntity, "INVALID_DIFFICULTY", "Неизвестная сложность", nil)
 	default:
 		writeError(w, r, http.StatusInternalServerError, "INTERNAL_ERROR", "Внутренняя ошибка сервера", nil)
 	}

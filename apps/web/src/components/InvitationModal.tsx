@@ -2,6 +2,7 @@ import { Avatar, Badge, Button, Group, Modal, Stack, Text, Title } from '@mantin
 import { IconCheck, IconX } from '@tabler/icons-react';
 
 import type { Invitation } from '../api/client';
+import { difficultyColor, difficultyLabel } from '../difficulties';
 import { problemClassColor, problemClassLabel } from '../problemClasses';
 import { InvitationCountdown } from './InvitationCountdown';
 
@@ -39,12 +40,19 @@ export function InvitationModal({
               </Text>
             </div>
           </Group>
-          <Badge
-            variant="light"
-            color={problemClassColor[invitation.problem_class]}
-          >
-            {problemClassLabel[invitation.problem_class]}
-          </Badge>
+          <Group gap="xs">
+            <Badge
+              variant="light"
+              color={problemClassColor[invitation.problem_class]}
+            >
+              {problemClassLabel[invitation.problem_class]}
+            </Badge>
+            {invitation.difficulty && (
+              <Badge variant="light" color={difficultyColor[invitation.difficulty]}>
+                {difficultyLabel[invitation.difficulty]}
+              </Badge>
+            )}
+          </Group>
           <InvitationCountdown expiresAt={invitation.expires_at} />
           <Group grow>
             <Button

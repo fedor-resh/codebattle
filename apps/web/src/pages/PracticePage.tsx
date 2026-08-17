@@ -28,10 +28,8 @@ import {
   type ProblemClass,
   type User,
 } from '../api/client';
+import { difficultyColor, difficultyLabel } from '../difficulties';
 import { problemClassColor, problemClassLabel, problemClassOptions } from '../problemClasses';
-
-const difficultyLabel = { easy: 'Простая', medium: 'Средняя', hard: 'Сложная' } as const;
-const difficultyColor = { easy: 'green', medium: 'yellow', hard: 'red' } as const;
 
 export function PracticePage({ currentUser }: { currentUser: User }) {
   const navigate = useNavigate();
