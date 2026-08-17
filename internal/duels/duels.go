@@ -56,6 +56,8 @@ type Match struct {
 	RoundWinnerID  string         `json:"round_winner_id,omitempty"`
 	PlayerOneReady bool           `json:"player_one_ready"`
 	PlayerTwoReady bool           `json:"player_two_ready"`
+	PlayerOneSkip  bool           `json:"player_one_skip"`
+	PlayerTwoSkip  bool           `json:"player_two_skip"`
 	WinningSource  string         `json:"winning_source_code,omitempty"`
 	CodeSnapshots  []CodeSnapshot `json:"code_snapshots"`
 	PausedAt       *time.Time     `json:"paused_at,omitempty"`
@@ -100,6 +102,7 @@ type Repository interface {
 	LeaveMatch(context.Context, string, string, time.Time) error
 	UpdateCode(context.Context, string, string, string, int64, int, int, time.Time) error
 	Ready(context.Context, string, string, time.Time) (Match, error)
+	Skip(context.Context, string, string, time.Time) (Match, error)
 }
 
 type Service struct {
@@ -170,6 +173,10 @@ func (s *Service) UpdateCode(
 
 func (s *Service) Ready(ctx context.Context, userID, matchID string) (Match, error) {
 	return s.repository.Ready(ctx, matchID, userID, s.now().UTC())
+}
+
+func (s *Service) Skip(ctx context.Context, userID, matchID string) (Match, error) {
+	return s.repository.Skip(ctx, matchID, userID, s.now().UTC())
 }
 
 func randomID() string {

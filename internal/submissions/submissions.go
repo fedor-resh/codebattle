@@ -232,6 +232,7 @@ func (r *Repository) Finish(ctx context.Context, job Job, status string, result 
 				paused_from_state = CASE WHEN state = 'paused' THEN 'waiting_ready' ELSE paused_from_state END,
 				round_winner_id = $2,
 				winning_source_code = $4,
+				player_one_skip = false, player_two_skip = false,
 				player_one_score = player_one_score + CASE WHEN player_one_id = $2 THEN 1 ELSE 0 END,
 				player_two_score = player_two_score + CASE WHEN player_two_id = $2 THEN 1 ELSE 0 END
 			WHERE id = $1

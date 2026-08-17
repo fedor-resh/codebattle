@@ -368,52 +368,7 @@ func (r *PostgresRepository) Ready(ctx context.Context, matchID, userID string, 
 			UPDATE matches SET player_one_ready = $2, player_two_ready = $3 WHERE id = $1
 		`, matchID, playerOneReady, playerTwoReady)
 	} else {
-		var nextProblemID string
-		err = tx.QueryRow(ctx, `
-			WITH latest AS (
-				SELECT DISTINCT ON (slug) id, slug, problem_class
-				FROM problem_versions
-				ORDER BY slug, version DESC
-			), seen_slugs AS (
-				SELECT slug FROM problem_versions
-				WHERE id = ANY (SELECT jsonb_array_elements_text($1::jsonb))
-			)
-			SELECT id FROM latest
-			WHERE problem_class = $2
-			  AND slug NOT IN (SELECT slug FROM seen_slugs)
-			ORDER BY random() LIMIT 1
-		`, history, problemClass).Scan(&nextProblemID)
-		resetHistory := false
-		if errors.Is(err, pgx.ErrNoRows) {
-			resetHistory = true
-			err = tx.QueryRow(ctx, `
-				SELECT id FROM (
-					SELECT DISTINCT ON (slug) id, slug, problem_class
-					FROM problem_versions
-					ORDER BY slug, version DESC
-				) latest
-				WHERE problem_class = $2
-				  AND slug <> (SELECT slug FROM problem_versions WHERE id = $1)
-				ORDER BY random() LIMIT 1
-			`, currentProblemID, problemClass).Scan(&nextProblemID)
-		}
-		if err != nil {
-			return Match{}, ErrProblemsMissing
-		}
-		_, err = tx.Exec(ctx, `
-			UPDATE matches SET
-				state = 'active', round_number = round_number + 1,
-				problem_version_id = $2, round_winner_id = NULL,
-				player_one_ready = false, player_two_ready = false,
-				winning_source_code = NULL,
-				problem_history = CASE WHEN $3
-					THEN jsonb_build_array($2::text)
-					ELSE problem_history || jsonb_build_array($2::text) END
-			WHERE id = $1
-		`, matchID, nextProblemID, resetHistory)
-		if err == nil {
-			_, err = tx.Exec(ctx, "DELETE FROM match_code_snapshots WHERE match_id = $1", matchID)
-		}
+		err = startNextRound(ctx, tx, matchID, problemClass, currentProblemID, history)
 	}
 	if err != nil {
 		return Match{}, err
@@ -422,6 +377,118 @@ func (r *PostgresRepository) Ready(ctx context.Context, matchID, userID string, 
 		return Match{}, err
 	}
 	return r.Match(ctx, matchID, userID)
+}
+
+func (r *PostgresRepository) Skip(ctx context.Context, matchID, userID string, now time.Time) (Match, error) {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return Match{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	var playerOneID, playerTwoID, state, currentProblemID string
+	var problemClass problems.Class
+	var playerOneSkip, playerTwoSkip bool
+	var history []byte
+	err = tx.QueryRow(ctx, `
+		SELECT player_one_id, player_two_id, state, problem_class, problem_version_id,
+			player_one_skip, player_two_skip, problem_history
+		FROM matches WHERE id = $1 FOR UPDATE
+	`, matchID).Scan(
+		&playerOneID, &playerTwoID, &state, &problemClass, &currentProblemID,
+		&playerOneSkip, &playerTwoSkip, &history,
+	)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Match{}, ErrMatchNotFound
+	}
+	if err != nil {
+		return Match{}, err
+	}
+	if userID != playerOneID && userID != playerTwoID {
+		return Match{}, ErrForbidden
+	}
+	if state != "active" {
+		return Match{}, ErrRoundNotActive
+	}
+	if userID == playerOneID {
+		playerOneSkip = !playerOneSkip
+	} else {
+		playerTwoSkip = !playerTwoSkip
+	}
+
+	if playerOneSkip && playerTwoSkip {
+		err = startNextRound(ctx, tx, matchID, problemClass, currentProblemID, history)
+	} else {
+		_, err = tx.Exec(ctx, `
+			UPDATE matches SET player_one_skip = $2, player_two_skip = $3 WHERE id = $1
+		`, matchID, playerOneSkip, playerTwoSkip)
+	}
+	if err != nil {
+		return Match{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return Match{}, err
+	}
+	return r.Match(ctx, matchID, userID)
+}
+
+// startNextRound переводит матч на следующую задачу класса без повторов внутри цикла.
+func startNextRound(
+	ctx context.Context,
+	tx pgx.Tx,
+	matchID string,
+	problemClass problems.Class,
+	currentProblemID string,
+	history []byte,
+) error {
+	var nextProblemID string
+	err := tx.QueryRow(ctx, `
+		WITH latest AS (
+			SELECT DISTINCT ON (slug) id, slug, problem_class
+			FROM problem_versions
+			ORDER BY slug, version DESC
+		), seen_slugs AS (
+			SELECT slug FROM problem_versions
+			WHERE id = ANY (SELECT jsonb_array_elements_text($1::jsonb))
+		)
+		SELECT id FROM latest
+		WHERE problem_class = $2
+		  AND slug NOT IN (SELECT slug FROM seen_slugs)
+		ORDER BY random() LIMIT 1
+	`, history, problemClass).Scan(&nextProblemID)
+	resetHistory := false
+	if errors.Is(err, pgx.ErrNoRows) {
+		resetHistory = true
+		err = tx.QueryRow(ctx, `
+			SELECT id FROM (
+				SELECT DISTINCT ON (slug) id, slug, problem_class
+				FROM problem_versions
+				ORDER BY slug, version DESC
+			) latest
+			WHERE problem_class = $2
+			  AND slug <> (SELECT slug FROM problem_versions WHERE id = $1)
+			ORDER BY random() LIMIT 1
+		`, currentProblemID, problemClass).Scan(&nextProblemID)
+	}
+	if err != nil {
+		return ErrProblemsMissing
+	}
+	if _, err := tx.Exec(ctx, `
+		UPDATE matches SET
+			state = 'active', round_number = round_number + 1,
+			problem_version_id = $2, round_winner_id = NULL,
+			player_one_ready = false, player_two_ready = false,
+			player_one_skip = false, player_two_skip = false,
+			winning_source_code = NULL,
+			problem_history = CASE WHEN $3
+				THEN jsonb_build_array($2::text)
+				ELSE problem_history || jsonb_build_array($2::text) END
+		WHERE id = $1
+	`, matchID, nextProblemID, resetHistory); err != nil {
+		return err
+	}
+	_, err = tx.Exec(ctx, "DELETE FROM match_code_snapshots WHERE match_id = $1", matchID)
+	return err
 }
 
 func (r *PostgresRepository) activeMatch(ctx context.Context, userID string) (Match, error) {
@@ -476,7 +543,8 @@ const matchQuery = `
 		COALESCE(problem.public_tests, '[]'::jsonb)::text,
 		COALESCE(problem.time_limit_ms, 0), COALESCE(problem.memory_limit_mb, 0),
 		m.round_number, COALESCE(m.round_winner_id, ''),
-		m.player_one_ready, m.player_two_ready, COALESCE(m.winning_source_code, ''),
+		m.player_one_ready, m.player_two_ready,
+		m.player_one_skip, m.player_two_skip, COALESCE(m.winning_source_code, ''),
 		COALESCE((
 			SELECT jsonb_agg(jsonb_build_object(
 				'user_id', snapshot.user_id,
@@ -515,7 +583,8 @@ func scanMatch(row rowScanner) (Match, error) {
 		&problem.Statement, &problem.FunctionSignature, &problem.StarterCode,
 		&publicTests, &problem.TimeLimitMS, &problem.MemoryLimitMB,
 		&match.RoundNumber, &match.RoundWinnerID,
-		&match.PlayerOneReady, &match.PlayerTwoReady, &match.WinningSource,
+		&match.PlayerOneReady, &match.PlayerTwoReady,
+		&match.PlayerOneSkip, &match.PlayerTwoSkip, &match.WinningSource,
 		&codeSnapshots,
 		&match.PausedAt,
 	)

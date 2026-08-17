@@ -859,6 +859,16 @@ Response `200`:
 Когда готов второй игрок, транзакция создает новый раунд, а response содержит
 `nextRoundStarted: true`; клиенты получают `round.started`.
 
+#### `POST /matches/{id}/skip`
+
+Headers: `X-CSRF-Token`. Request body: `{}`. Response `200` содержит match с
+`player_one_skip` и `player_two_skip`.
+
+Голос за пропуск переключается повторным вызовом. Когда за пропуск проголосовали
+оба игрока, транзакция переводит матч на следующую задачу класса: счет и
+`round_winner_id` не меняются, снимки кода очищаются. Доступно только в состоянии
+`active`; иначе `409 ROUND_NOT_ACTIVE`.
+
 #### `POST /matches/{id}/leave`
 
 Headers: `Idempotency-Key`, `X-CSRF-Token`. Request body: `{}`. Response `204`.

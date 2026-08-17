@@ -148,6 +148,19 @@ func (h duelHandlers) ready(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"match": match})
 }
 
+func (h duelHandlers) skip(w http.ResponseWriter, r *http.Request) {
+	user, ok := h.accounts.authenticate(w, r)
+	if !ok {
+		return
+	}
+	match, err := h.service.Skip(r.Context(), user.ID, r.PathValue("id"))
+	if err != nil {
+		h.writeDuelError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"match": match})
+}
+
 func (h duelHandlers) writeDuelError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, duels.ErrSelfInvitation):

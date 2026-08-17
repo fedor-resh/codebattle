@@ -80,6 +80,7 @@ func NewHandler(logger *slog.Logger, checker *health.Checker, environment string
 			mux.HandleFunc("POST /api/v1/matches/{id}/leave", duelRoutes.leaveMatch)
 			mux.HandleFunc("PUT /api/v1/matches/{id}/code", duelRoutes.updateCode)
 			mux.HandleFunc("POST /api/v1/matches/{id}/ready", duelRoutes.ready)
+			mux.HandleFunc("POST /api/v1/matches/{id}/skip", duelRoutes.skip)
 		}
 		if deps.Submissions != nil {
 			submissionRoutes := submissionHandlers{accounts: handlers, repository: deps.Submissions}

@@ -15,7 +15,13 @@ import {
 } from '@mantine/core';
 import { modals } from '@mantine/modals';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { IconArrowLeft, IconCloudCheck, IconDoorExit, IconPlayerPlay } from '@tabler/icons-react';
+import {
+  IconArrowLeft,
+  IconCloudCheck,
+  IconDoorExit,
+  IconPlayerPlay,
+  IconPlayerTrackNext,
+} from '@tabler/icons-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
@@ -26,6 +32,7 @@ import {
   getSubmission,
   leaveMatch,
   readyForNextRound,
+  toggleSkipVote,
   updateCode,
   type Submission,
   type User,
@@ -79,6 +86,10 @@ export function MatchShellPage({ currentUser }: { currentUser: User }) {
   });
   const readyMutation = useMutation({
     mutationFn: () => readyForNextRound(matchId),
+    onSuccess: (nextMatch) => queryClient.setQueryData(['match', matchId], nextMatch),
+  });
+  const skipMutation = useMutation({
+    mutationFn: () => toggleSkipVote(matchId),
     onSuccess: (nextMatch) => queryClient.setQueryData(['match', matchId], nextMatch),
   });
 
@@ -184,6 +195,8 @@ export function MatchShellPage({ currentUser }: { currentUser: User }) {
   );
   const currentReady = currentIsPlayerOne ? match.player_one_ready : match.player_two_ready;
   const opponentReady = currentIsPlayerOne ? match.player_two_ready : match.player_one_ready;
+  const currentSkip = currentIsPlayerOne ? match.player_one_skip : match.player_two_skip;
+  const opponentSkip = currentIsPlayerOne ? match.player_two_skip : match.player_one_skip;
   const winner = match.round_winner_id === me.id ? me.username : opponent.username;
   const remoteCursor = opponentSnapshot
     ? {
@@ -323,15 +336,36 @@ export function MatchShellPage({ currentUser }: { currentUser: User }) {
 
             <Paper withBorder p="md" radius="md">
               <Stack>
-                <Button
-                  disabled={ended}
-                  loading={submitMutation.isPending}
-                  leftSection={<IconPlayerPlay size={18} />}
-                  onClick={() => submitMutation.mutate()}
-                  ml="auto"
-                >
-                  {waitingReady ? 'Проверить вне зачёта' : 'Отправить решение'}
-                </Button>
+                {opponentSkip && !currentSkip && (
+                  <Alert color="orange" variant="light">
+                    {opponent.username} предлагает пропустить задачу. Нажмите «Пропустить задачу»,
+                    чтобы перейти к следующей.
+                  </Alert>
+                )}
+                <Group justify="space-between" wrap="wrap">
+                  {ended || waitingReady ? (
+                    <div />
+                  ) : (
+                    <Button
+                      variant={currentSkip ? 'light' : 'default'}
+                      color="orange"
+                      loading={skipMutation.isPending}
+                      leftSection={<IconPlayerTrackNext size={18} />}
+                      onClick={() => skipMutation.mutate()}
+                    >
+                      {currentSkip ? 'Отменить пропуск (1/2)' : 'Пропустить задачу'}
+                    </Button>
+                  )}
+                  <Button
+                    disabled={ended}
+                    loading={submitMutation.isPending}
+                    leftSection={<IconPlayerPlay size={18} />}
+                    onClick={() => submitMutation.mutate()}
+                    ml="auto"
+                  >
+                    {waitingReady ? 'Проверить вне зачёта' : 'Отправить решение'}
+                  </Button>
+                </Group>
                 <JudgeResultPanel submission={submissionQuery.data} />
                 {submitMutation.error && (
                   <Alert color="red">

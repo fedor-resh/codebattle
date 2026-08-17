@@ -73,6 +73,10 @@ func (*repositoryStub) Ready(context.Context, string, string, time.Time) (Match,
 	return Match{}, nil
 }
 
+func (*repositoryStub) Skip(context.Context, string, string, time.Time) (Match, error) {
+	return Match{}, nil
+}
+
 func TestCreateInvitationUsesThirtySecondTTL(t *testing.T) {
 	repository := &repositoryStub{}
 	service := NewService(repository)

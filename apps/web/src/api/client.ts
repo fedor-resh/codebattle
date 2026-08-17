@@ -35,6 +35,8 @@ export type Match = {
   round_winner_id?: string;
   player_one_ready: boolean;
   player_two_ready: boolean;
+  player_one_skip: boolean;
+  player_two_skip: boolean;
   winning_source_code?: string;
   code_snapshots: CodeSnapshot[];
   paused_at?: string;
@@ -270,5 +272,11 @@ export async function updateCode(
 export async function readyForNextRound(matchId: string): Promise<Match> {
   return (
     await request<{ match: Match }>(`/api/v1/matches/${matchId}/ready`, { method: 'POST' })
+  ).match;
+}
+
+export async function toggleSkipVote(matchId: string): Promise<Match> {
+  return (
+    await request<{ match: Match }>(`/api/v1/matches/${matchId}/skip`, { method: 'POST' })
   ).match;
 }
