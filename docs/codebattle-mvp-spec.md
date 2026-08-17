@@ -1186,6 +1186,12 @@ Compile workspace имеет фиксированную структуру:
 | 27 | `parse-config` | `func Solve(text string) []string` | Разобрать конфигурацию через helper с sentinel-ошибками. |
 | 28 | `bank-account` | `func Solve(commands []string) []int` | Обработать команды через методы типа `Account`. |
 | 29 | `compose-filters` | `func Solve(nums []int, ops []string) []int` | Применить типы, реализующие интерфейс `Filter`. |
+| 30 | `bounded-sink` | `func Solve(limit int, chunks []string) []string` | Реализовать `Sink` с лимитом и sentinel `ErrFull`. |
+| 31 | `embedded-greeter` | `func Solve(kinds []string, names []string) []string` | Встраивание и переопределение `Greet`. |
+| 32 | `join-validation` | `func Solve(fields []string) []string` | Собрать ошибки через `errors.Join` и `Unwrap`. |
+| 33 | `panic-guard` | `func Solve(nums []int, divisors []int) []string` | Перехватить панику деления через `recover`. |
+| 34 | `sortable-users` | `func Solve(names []string, scores []int) []string` | Реализовать `sort.Interface` для `ByScore`. |
+| 35 | `typed-nil-error` | `func Solve(values []int) string` | Вернуть nil-интерфейс, а не typed nil. |
 
 Для каждой задачи в MVP требуется не менее двух public и трех hidden cases,
 включая граничные значения. Hidden tests не должны зависеть от случайности,

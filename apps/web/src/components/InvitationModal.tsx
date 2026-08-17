@@ -2,7 +2,7 @@ import { Avatar, Badge, Button, Group, Modal, Stack, Text, Title } from '@mantin
 import { IconCheck, IconX } from '@tabler/icons-react';
 
 import type { Invitation } from '../api/client';
-import { problemClassLabel } from '../problemClasses';
+import { problemClassColor, problemClassLabel } from '../problemClasses';
 import { InvitationCountdown } from './InvitationCountdown';
 
 export function InvitationModal({
@@ -41,7 +41,7 @@ export function InvitationModal({
           </Group>
           <Badge
             variant="light"
-            color={invitation.problem_class === 'concurrency' ? 'violet' : 'blue'}
+            color={problemClassColor[invitation.problem_class]}
           >
             {problemClassLabel[invitation.problem_class]}
           </Badge>

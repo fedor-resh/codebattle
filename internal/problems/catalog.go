@@ -47,10 +47,11 @@ type Class string
 const (
 	ClassAlgorithms  Class = "algorithms"
 	ClassConcurrency Class = "concurrency"
+	ClassOOP         Class = "oop"
 )
 
 func IsValidClass(value Class) bool {
-	return value == ClassAlgorithms || value == ClassConcurrency
+	return value == ClassAlgorithms || value == ClassConcurrency || value == ClassOOP
 }
 
 type Requirements struct {

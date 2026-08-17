@@ -11,7 +11,7 @@ export type UserPage = {
   next_cursor?: string;
 };
 
-export type ProblemClass = 'algorithms' | 'concurrency';
+export type ProblemClass = 'algorithms' | 'concurrency' | 'oop';
 
 export type Invitation = {
   id: string;

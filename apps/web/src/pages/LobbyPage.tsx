@@ -35,7 +35,7 @@ import {
 import { InvitationCountdown } from '../components/InvitationCountdown';
 import { InvitationModal } from '../components/InvitationModal';
 import { UserListItem } from '../components/UserListItem';
-import { problemClassLabel, problemClassOptions } from '../problemClasses';
+import { problemClassColor, problemClassLabel, problemClassOptions } from '../problemClasses';
 
 function showRequestError(error: unknown) {
   notifications.show({
@@ -151,7 +151,7 @@ export function LobbyPage({ currentUser }: { currentUser: User }) {
               </Text>
               <Badge
                 variant="light"
-                color={invitationState.outgoing.problem_class === 'concurrency' ? 'violet' : 'blue'}
+                color={problemClassColor[invitationState.outgoing.problem_class]}
               >
                 {problemClassLabel[invitationState.outgoing.problem_class]}
               </Badge>

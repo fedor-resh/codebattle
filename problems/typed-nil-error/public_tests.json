@@ -1,0 +1,6 @@
+[
+  {"arguments": [[1, 2, 3]], "expected": "ok"},
+  {"arguments": [[4, -2, -8]], "expected": "invalid value at index 1"},
+  {"arguments": [[]], "expected": "ok"},
+  {"arguments": [[0]], "expected": "ok"}
+]

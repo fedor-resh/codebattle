@@ -1,9 +1,9 @@
 slug: bank-account
 title: "Банковский счёт"
 difficulty: medium
-class: algorithms
+class: oop
 function: Solve
 signature: "func Solve(commands []string) []int"
-version: 1
+version: 2
 time_limit_ms: 2000
 memory_limit_mb: 256

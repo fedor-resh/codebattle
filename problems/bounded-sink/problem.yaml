@@ -1,0 +1,9 @@
+slug: bounded-sink
+title: "Ограниченный приёмник"
+difficulty: medium
+class: oop
+function: Solve
+signature: "func Solve(limit int, chunks []string) []string"
+version: 1
+time_limit_ms: 2000
+memory_limit_mb: 256

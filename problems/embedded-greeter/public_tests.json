@@ -1,0 +1,6 @@
+[
+  {"arguments": [["base", "shouty", "polite"], ["Ann", "Bob", "Cara"]], "expected": ["Hello, Ann", "HEY, BOB!", "Please, Hello, Cara"]},
+  {"arguments": [["shouty"], ["go"]], "expected": ["HEY, GO!"]},
+  {"arguments": [["unknown", "base"], ["Skip", "Ada"]], "expected": ["Hello, Ada"]},
+  {"arguments": [[], []], "expected": []}
+]

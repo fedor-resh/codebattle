@@ -1,0 +1,6 @@
+[
+  {"arguments": [10, ["ab", "cd", "efgh"]], "expected": ["2", "2", "4"]},
+  {"arguments": [3, ["ab", "cd", ""]], "expected": ["2", "sink is full", "0"]},
+  {"arguments": [0, ["a"]], "expected": ["sink is full"]},
+  {"arguments": [4, []], "expected": []}
+]

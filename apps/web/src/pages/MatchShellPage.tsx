@@ -34,7 +34,7 @@ import { CodePane, type CursorPosition } from '../components/CodePane';
 import { JudgeResultPanel } from '../components/JudgeResultPanel';
 import { ProblemPanel } from '../components/ProblemPanel';
 import { ReadyOverlay } from '../components/ReadyOverlay';
-import { problemClassLabel } from '../problemClasses';
+import { problemClassColor, problemClassLabel } from '../problemClasses';
 
 export function MatchShellPage({ currentUser }: { currentUser: User }) {
   const { matchId = '' } = useParams();
@@ -210,7 +210,7 @@ export function MatchShellPage({ currentUser }: { currentUser: User }) {
             <Group>
               <Title order={3}>Раунд {match.round_number} · {opponent.username}</Title>
               <Badge
-                color={match.problem_class === 'concurrency' ? 'violet' : 'blue'}
+                color={problemClassColor[match.problem_class]}
                 variant="light"
               >
                 {problemClassLabel[match.problem_class]}

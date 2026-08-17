@@ -1,0 +1,9 @@
+slug: embedded-greeter
+title: "Встроенное приветствие"
+difficulty: medium
+class: oop
+function: Solve
+signature: "func Solve(kinds []string, names []string) []string"
+version: 1
+time_limit_ms: 2000
+memory_limit_mb: 256

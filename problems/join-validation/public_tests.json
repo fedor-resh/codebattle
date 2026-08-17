@@ -1,0 +1,6 @@
+[
+  {"arguments": [["ok", "fine"]], "expected": []},
+  {"arguments": [["", "toolongname", "ok", "ok"]], "expected": [":empty", "ok:duplicate", "toolongname:too long"]},
+  {"arguments": [["alpha"]], "expected": []},
+  {"arguments": [["abcdefgh", "abcdefgh"]], "expected": ["abcdefgh:duplicate"]}
+]

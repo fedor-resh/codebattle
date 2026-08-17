@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func TestCatalogContainsThirtySixValidProblems(t *testing.T) {
+func TestCatalogContainsFortyTwoValidProblems(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
 
@@ -15,8 +15,8 @@ func TestCatalogContainsThirtySixValidProblems(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(catalog) != 36 {
-		t.Fatalf("catalog size = %d, want 36", len(catalog))
+	if len(catalog) != 42 {
+		t.Fatalf("catalog size = %d, want 42", len(catalog))
 	}
 	seen := map[string]bool{}
 	classCounts := map[Class]int{}
@@ -30,7 +30,7 @@ func TestCatalogContainsThirtySixValidProblems(t *testing.T) {
 			t.Fatalf("problem %s hash length = %d", problem.Slug, len(problem.ContentHash))
 		}
 	}
-	if classCounts[ClassAlgorithms] != 29 || classCounts[ClassConcurrency] != 7 {
+	if classCounts[ClassAlgorithms] != 25 || classCounts[ClassConcurrency] != 7 || classCounts[ClassOOP] != 10 {
 		t.Fatalf("class counts = %v", classCounts)
 	}
 	for _, problem := range catalog {
@@ -57,6 +57,12 @@ func TestValidateMetadataRejectsInvalidClassAndRequirements(t *testing.T) {
 	algorithmWithRequirements.Requirements.Goroutine = true
 	if err := validateMetadata(algorithmWithRequirements, "sample"); err == nil {
 		t.Fatal("algorithm task with concurrency requirements was accepted")
+	}
+
+	oopTask := base
+	oopTask.Class = ClassOOP
+	if err := validateMetadata(oopTask, "sample"); err != nil {
+		t.Fatalf("oop task should be accepted: %v", err)
 	}
 
 	concurrencyWithoutRequirements := base

@@ -1,0 +1,6 @@
+[
+  {"arguments": [["bob", "ann", "cara"], [10, 20, 10]], "expected": ["ann:20", "bob:10", "cara:10"]},
+  {"arguments": [["zeta", "alpha"], [5, 5]], "expected": ["alpha:5", "zeta:5"]},
+  {"arguments": [["only"], [3]], "expected": ["only:3"]},
+  {"arguments": [[], []], "expected": []}
+]

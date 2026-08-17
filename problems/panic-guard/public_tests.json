@@ -1,0 +1,6 @@
+[
+  {"arguments": [[10, 8, 9], [2, 0, 3]], "expected": ["5", "panic recovered", "3"]},
+  {"arguments": [[-7], [2]], "expected": ["-3"]},
+  {"arguments": [[0], [1]], "expected": ["0"]},
+  {"arguments": [[], []], "expected": []}
+]
