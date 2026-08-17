@@ -1,0 +1,5 @@
+[
+  {"arguments": [[2, 1, 2, 3, 1], "square"], "expected": [4, 1, 4, 9, 1]},
+  {"arguments": [[-4, -4, 0, 5], "identity"], "expected": [-4, -4, 0, 5]},
+  {"arguments": [[], "square"], "expected": []}
+]

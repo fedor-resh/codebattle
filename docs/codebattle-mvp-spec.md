@@ -1182,6 +1182,10 @@ Compile workspace имеет фиксированную структуру:
 | 23 | `prefix-sums` | `func Solve(nums []int) []int` | Построить массив префиксных сумм. |
 | 24 | `rune-frequency` | `func Solve(text string) map[string]int` | Посчитать Unicode-символы строки. |
 | 25 | `sorted-intersection` | `func Solve(left, right []int) []int` | Найти пересечение с учетом повторов. |
+| 26 | `safe-eval` | `func Solve(expr string) string` | Вычислить выражение через helper с sentinel-ошибками. |
+| 27 | `parse-config` | `func Solve(text string) []string` | Разобрать конфигурацию через helper с sentinel-ошибками. |
+| 28 | `bank-account` | `func Solve(commands []string) []int` | Обработать команды через методы типа `Account`. |
+| 29 | `compose-filters` | `func Solve(nums []int, ops []string) []int` | Применить типы, реализующие интерфейс `Filter`. |
 
 Для каждой задачи в MVP требуется не менее двух public и трех hidden cases,
 включая граничные значения. Hidden tests не должны зависеть от случайности,

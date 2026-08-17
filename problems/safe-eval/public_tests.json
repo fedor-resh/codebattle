@@ -1,0 +1,6 @@
+[
+  {"arguments": ["12 + 5"], "expected": "17"},
+  {"arguments": ["-8*3"], "expected": "-24"},
+  {"arguments": ["10 / 0"], "expected": "division by zero"},
+  {"arguments": ["1 ^ 2"], "expected": "invalid expression"}
+]

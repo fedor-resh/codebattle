@@ -100,6 +100,40 @@ func Solve(delays []int, timeoutMS int, work func(context.Context, int) bool) in
 }
 `,
 		},
+		{
+			slug:   "stage-pipeline",
+			marker: "work was not performed in parallel",
+			source: `package solution
+
+func Solve(nums []int, stageA func(int) int, stageB func(int) int) []int {
+	result := make([]int, len(nums))
+	for index, value := range nums {
+		result[index] = stageB(stageA(value))
+	}
+	return result
+}
+`,
+		},
+		{
+			slug:   "once-per-key",
+			marker: "work was not performed in parallel",
+			source: `package solution
+
+func Solve(keys []int, work func(int) int) []int {
+	result := make([]int, len(keys))
+	cache := make(map[int]int)
+	for index, key := range keys {
+		value, exists := cache[key]
+		if !exists {
+			value = work(key)
+			cache[key] = value
+		}
+		result[index] = value
+	}
+	return result
+}
+`,
+		},
 	}
 
 	for _, testCase := range tests {

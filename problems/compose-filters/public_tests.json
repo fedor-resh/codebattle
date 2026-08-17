@@ -1,0 +1,6 @@
+[
+  {"arguments": [[1, 2, 3], ["add 2", "mul 3"]], "expected": [9, 12, 15]},
+  {"arguments": [[-5, 5, 20], ["clamp 0 10"]], "expected": [0, 5, 10]},
+  {"arguments": [[2, -2], ["mul -3", "add 1", "clamp -4 4"]], "expected": [-4, 4]},
+  {"arguments": [[], ["add 10"]], "expected": []}
+]

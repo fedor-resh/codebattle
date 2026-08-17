@@ -1,0 +1,9 @@
+slug: parse-config
+title: "Разбор конфигурации"
+difficulty: medium
+class: algorithms
+function: Solve
+signature: "func Solve(text string) []string"
+version: 1
+time_limit_ms: 2000
+memory_limit_mb: 256

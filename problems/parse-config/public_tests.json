@@ -1,0 +1,6 @@
+[
+  {"arguments": ["port=8080\nworkers = 4\n# local settings\ntimeout=30"], "expected": ["port=8080", "timeout=30", "workers=4"]},
+  {"arguments": ["\n # empty config\n"], "expected": []},
+  {"arguments": ["port=80\nport=81"], "expected": ["duplicate key: line 2"]},
+  {"arguments": ["threads=many"], "expected": ["invalid value: line 1"]}
+]

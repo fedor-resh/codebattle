@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func TestCatalogContainsThirtyValidProblems(t *testing.T) {
+func TestCatalogContainsThirtySixValidProblems(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
 
@@ -15,8 +15,8 @@ func TestCatalogContainsThirtyValidProblems(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(catalog) != 30 {
-		t.Fatalf("catalog size = %d, want 30", len(catalog))
+	if len(catalog) != 36 {
+		t.Fatalf("catalog size = %d, want 36", len(catalog))
 	}
 	seen := map[string]bool{}
 	classCounts := map[Class]int{}
@@ -30,7 +30,7 @@ func TestCatalogContainsThirtyValidProblems(t *testing.T) {
 			t.Fatalf("problem %s hash length = %d", problem.Slug, len(problem.ContentHash))
 		}
 	}
-	if classCounts[ClassAlgorithms] != 25 || classCounts[ClassConcurrency] != 5 {
+	if classCounts[ClassAlgorithms] != 29 || classCounts[ClassConcurrency] != 7 {
 		t.Fatalf("class counts = %v", classCounts)
 	}
 	for _, problem := range catalog {

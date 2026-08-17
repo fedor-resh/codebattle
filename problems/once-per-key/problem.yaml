@@ -1,0 +1,9 @@
+slug: once-per-key
+title: "Один расчёт на ключ"
+difficulty: hard
+class: concurrency
+function: Solve
+signature: "func Solve(keys []int, work func(int) int) []int"
+version: 1
+time_limit_ms: 3000
+memory_limit_mb: 256

@@ -1,0 +1,9 @@
+slug: safe-eval
+title: "Безопасный калькулятор"
+difficulty: medium
+class: algorithms
+function: Solve
+signature: "func Solve(expr string) string"
+version: 1
+time_limit_ms: 2000
+memory_limit_mb: 256

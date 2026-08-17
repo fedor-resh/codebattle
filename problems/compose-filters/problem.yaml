@@ -1,0 +1,9 @@
+slug: compose-filters
+title: "Конвейер фильтров"
+difficulty: medium
+class: algorithms
+function: Solve
+signature: "func Solve(nums []int, ops []string) []int"
+version: 1
+time_limit_ms: 2000
+memory_limit_mb: 256

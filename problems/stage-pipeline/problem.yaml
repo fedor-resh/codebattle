@@ -1,0 +1,9 @@
+slug: stage-pipeline
+title: "Двухступенчатый конвейер"
+difficulty: medium
+class: concurrency
+function: Solve
+signature: "func Solve(nums []int, stageA func(int) int, stageB func(int) int) []int"
+version: 1
+time_limit_ms: 3000
+memory_limit_mb: 256
