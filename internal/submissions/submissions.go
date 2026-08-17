@@ -18,6 +18,7 @@ var (
 	ErrInvalidSource      = errors.New("invalid source")
 	ErrSourceTooLarge     = errors.New("source is too large")
 	ErrMatchNotFound      = errors.New("match not found")
+	ErrSessionNotFound    = errors.New("practice session not found")
 	ErrRateLimited        = errors.New("submission rate limited")
 	ErrTooManyPending     = errors.New("too many pending submissions")
 	ErrSubmissionNotFound = errors.New("submission not found")
@@ -34,6 +35,7 @@ type Submission struct {
 
 type Job struct {
 	Submission
+	PracticeSessionID string
 	ProblemVersionID  string
 	FunctionSignature string
 	SourceCode        string
@@ -123,14 +125,89 @@ func (r *Repository) Create(ctx context.Context, userID, matchID, source string)
 	return submission, nil
 }
 
+func (r *Repository) CreatePractice(ctx context.Context, userID, sessionID, source string) (Submission, error) {
+	if len([]byte(source)) > 64*1024 {
+		return Submission{}, ErrSourceTooLarge
+	}
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return Submission{}, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	var problemVersionID, functionSignature string
+	if err := tx.QueryRow(ctx, `
+		SELECT session.problem_version_id, problem.function_signature
+		FROM practice_sessions session
+		JOIN problem_versions problem ON problem.id = session.problem_version_id
+		WHERE session.id = $1 AND session.user_id = $2
+		FOR UPDATE OF session
+	`, sessionID, userID).Scan(
+		&problemVersionID, &functionSignature,
+	); errors.Is(err, pgx.ErrNoRows) {
+		return Submission{}, ErrSessionNotFound
+	} else if err != nil {
+		return Submission{}, err
+	}
+	if err := problems.ValidateSolution(source, functionSignature); err != nil {
+		return Submission{}, fmt.Errorf("%w: %v", ErrInvalidSource, err)
+	}
+	var pending int
+	if err := tx.QueryRow(ctx, `
+		SELECT count(*) FROM submissions
+		WHERE practice_session_id = $1 AND user_id = $2
+			AND status IN ('queued', 'compiling', 'running')
+	`, sessionID, userID).Scan(&pending); err != nil {
+		return Submission{}, err
+	}
+	if pending >= 3 {
+		return Submission{}, ErrTooManyPending
+	}
+
+	var recent bool
+	if err := tx.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM submissions WHERE practice_session_id = $1 AND user_id = $2
+				AND created_at > now() - interval '2 seconds'
+		)
+	`, sessionID, userID).Scan(&recent); err != nil {
+		return Submission{}, err
+	}
+	if recent {
+		return Submission{}, ErrRateLimited
+	}
+
+	submission := Submission{
+		ID:        randomID(),
+		UserID:    userID,
+		Status:    "queued",
+		CreatedAt: time.Now().UTC(),
+	}
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO submissions (
+			id, match_id, practice_session_id, user_id, problem_version_id, source_code, status, created_at
+		)
+		VALUES ($1, NULL, $2, $3, $4, $5, 'queued', $6)
+	`, submission.ID, sessionID, userID, problemVersionID, source, submission.CreatedAt); err != nil {
+		return Submission{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return Submission{}, err
+	}
+	return submission, nil
+}
+
 func (r *Repository) Get(ctx context.Context, submissionID, userID string) (Submission, error) {
 	var submission Submission
 	var result []byte
 	err := r.pool.QueryRow(ctx, `
-		SELECT s.id, s.match_id, s.user_id, s.status, COALESCE(s.result, '{}'::jsonb), s.created_at
+		SELECT s.id, COALESCE(s.match_id, ''), s.user_id, s.status, COALESCE(s.result, '{}'::jsonb), s.created_at
 		FROM submissions s
-		JOIN matches m ON m.id = s.match_id
-		WHERE s.id = $1 AND (m.player_one_id = $2 OR m.player_two_id = $2)
+		LEFT JOIN matches m ON m.id = s.match_id
+		LEFT JOIN practice_sessions p ON p.id = s.practice_session_id
+		WHERE s.id = $1 AND (
+			m.player_one_id = $2 OR m.player_two_id = $2 OR p.user_id = $2
+		)
 	`, submissionID, userID).Scan(
 		&submission.ID, &submission.MatchID, &submission.UserID,
 		&submission.Status, &result, &submission.CreatedAt,
@@ -157,7 +234,8 @@ func (r *Repository) Claim(ctx context.Context) (Job, error) {
 	var job Job
 	var publicTests string
 	err = tx.QueryRow(ctx, `
-		SELECT s.id, s.match_id, s.user_id, s.status, s.created_at,
+		SELECT s.id, COALESCE(s.match_id, ''), s.user_id, s.status, s.created_at,
+			COALESCE(s.practice_session_id, ''),
 			s.problem_version_id, problem.function_signature,
 			s.source_code, problem.public_tests::text,
 			bundle.hidden_test_source,
@@ -171,6 +249,7 @@ func (r *Repository) Claim(ctx context.Context) (Job, error) {
 		LIMIT 1
 	`).Scan(
 		&job.ID, &job.MatchID, &job.UserID, &job.Status, &job.CreatedAt,
+		&job.PracticeSessionID,
 		&job.ProblemVersionID, &job.FunctionSignature,
 		&job.SourceCode, &publicTests, &job.HiddenTestSource,
 		&job.TimeLimitMS, &job.MemoryLimitMB,
@@ -225,7 +304,14 @@ func (r *Repository) Finish(ctx context.Context, job Job, status string, result 
 	`, job.ID, status, encoded); err != nil {
 		return err
 	}
-	if status == "accepted" {
+	if status == "accepted" && job.PracticeSessionID != "" {
+		if _, err := tx.Exec(ctx, `
+			UPDATE practice_sessions SET solved_at = COALESCE(solved_at, now()), updated_at = now()
+			WHERE id = $1
+		`, job.PracticeSessionID); err != nil {
+			return err
+		}
+	} else if status == "accepted" {
 		if _, err := tx.Exec(ctx, `
 			UPDATE matches SET
 				state = CASE WHEN state = 'paused' THEN 'paused' ELSE 'waiting_ready' END,

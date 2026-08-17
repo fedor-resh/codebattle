@@ -55,6 +55,8 @@ func (h submissionHandlers) writeError(w http.ResponseWriter, r *http.Request, e
 		writeError(w, r, http.StatusRequestEntityTooLarge, "SOURCE_TOO_LARGE", "Максимальный размер исходника — 64 КБ", nil)
 	case errors.Is(err, submissions.ErrMatchNotFound):
 		writeError(w, r, http.StatusConflict, "MATCH_NOT_ACTIVE", "Матч не найден или уже завершён", nil)
+	case errors.Is(err, submissions.ErrSessionNotFound):
+		writeError(w, r, http.StatusNotFound, "SESSION_NOT_FOUND", "Сессия тренировки не найдена", nil)
 	case errors.Is(err, submissions.ErrRateLimited):
 		writeError(w, r, http.StatusTooManyRequests, "SUBMISSION_RATE_LIMIT", "Подождите 2 секунды перед следующей отправкой", nil)
 	case errors.Is(err, submissions.ErrTooManyPending):

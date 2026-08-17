@@ -16,6 +16,7 @@ import (
 	"codebattle.local/codebattle/internal/duels"
 	"codebattle.local/codebattle/internal/health"
 	"codebattle.local/codebattle/internal/httpapi"
+	"codebattle.local/codebattle/internal/practice"
 	"codebattle.local/codebattle/internal/submissions"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -51,6 +52,7 @@ func main() {
 	accountService := accounts.NewService(accounts.NewPostgresStore(pool))
 	duelRepository := duels.NewPostgresRepository(pool)
 	duelService := duels.NewService(duelRepository)
+	practiceService := practice.NewService(practice.NewPostgresRepository(pool))
 	submissionRepository := submissions.NewRepository(pool)
 
 	checker := health.NewChecker(
@@ -62,6 +64,7 @@ func main() {
 		Handler: httpapi.NewHandler(logger, checker, cfg.Environment, httpapi.Dependencies{
 			Accounts:       accountService,
 			Duels:          duelService,
+			Practice:       practiceService,
 			Submissions:    submissionRepository,
 			SecureCookies:  cfg.Environment == "production",
 			AllowedOrigins: cfg.PublicOrigins,

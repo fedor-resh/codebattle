@@ -11,6 +11,7 @@ import (
 
 	"codebattle.local/codebattle/internal/duels"
 	"codebattle.local/codebattle/internal/health"
+	"codebattle.local/codebattle/internal/practice"
 )
 
 type healthyDependency struct{ name string }
@@ -29,6 +30,21 @@ func TestInvalidProblemClassErrorContract(t *testing.T) {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusUnprocessableEntity)
 	}
 	if body := response.Body.String(); !bytes.Contains([]byte(body), []byte(`"code":"INVALID_PROBLEM_CLASS"`)) {
+		t.Fatalf("response body = %s", body)
+	}
+}
+
+func TestPracticeSessionNotFoundErrorContract(t *testing.T) {
+	t.Parallel()
+
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/practice/sessions/missing", nil)
+	response := httptest.NewRecorder()
+	practiceHandlers{}.writeError(response, request, practice.ErrSessionNotFound)
+
+	if response.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusNotFound)
+	}
+	if body := response.Body.String(); !bytes.Contains([]byte(body), []byte(`"code":"SESSION_NOT_FOUND"`)) {
 		t.Fatalf("response body = %s", body)
 	}
 }

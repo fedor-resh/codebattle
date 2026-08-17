@@ -280,3 +280,61 @@ export async function toggleSkipVote(matchId: string): Promise<Match> {
     await request<{ match: Match }>(`/api/v1/matches/${matchId}/skip`, { method: 'POST' })
   ).match;
 }
+
+export type PracticeProblem = {
+  slug: string;
+  title: string;
+  difficulty: Problem['difficulty'];
+  problem_class: ProblemClass;
+  requirements: Problem['requirements'];
+  solved: boolean;
+};
+
+export type PracticeSession = {
+  id: string;
+  problem: Problem;
+  source_code: string;
+  revision: number;
+  solved_at?: string;
+};
+
+export async function listPracticeProblems(): Promise<PracticeProblem[]> {
+  return (await request<{ problems: PracticeProblem[] }>('/api/v1/practice/problems')).problems;
+}
+
+export async function startPracticeSession(slug: string): Promise<PracticeSession> {
+  return (
+    await request<{ session: PracticeSession }>('/api/v1/practice/sessions', {
+      method: 'POST',
+      body: JSON.stringify({ slug }),
+    })
+  ).session;
+}
+
+export async function getPracticeSession(sessionId: string): Promise<PracticeSession> {
+  return (await request<{ session: PracticeSession }>(`/api/v1/practice/sessions/${sessionId}`))
+    .session;
+}
+
+export async function updatePracticeCode(
+  sessionId: string,
+  sourceCode: string,
+  revision: number,
+): Promise<void> {
+  await request(`/api/v1/practice/sessions/${sessionId}/code`, {
+    method: 'PUT',
+    body: JSON.stringify({ source_code: sourceCode, revision }),
+  });
+}
+
+export async function createPracticeSubmission(
+  sessionId: string,
+  sourceCode: string,
+): Promise<Submission> {
+  return (
+    await request<{ submission: Submission }>(`/api/v1/practice/sessions/${sessionId}/submissions`, {
+      method: 'POST',
+      body: JSON.stringify({ source_code: sourceCode }),
+    })
+  ).submission;
+}

@@ -14,6 +14,7 @@ import (
 	"codebattle.local/codebattle/internal/accounts"
 	"codebattle.local/codebattle/internal/duels"
 	"codebattle.local/codebattle/internal/health"
+	"codebattle.local/codebattle/internal/practice"
 	"codebattle.local/codebattle/internal/submissions"
 )
 
@@ -22,6 +23,7 @@ const appVersion = "0.3.0"
 type Dependencies struct {
 	Accounts       *accounts.Service
 	Duels          *duels.Service
+	Practice       *practice.Service
 	Submissions    *submissions.Repository
 	SecureCookies  bool
 	AllowedOrigins []string
@@ -86,6 +88,18 @@ func NewHandler(logger *slog.Logger, checker *health.Checker, environment string
 			submissionRoutes := submissionHandlers{accounts: handlers, repository: deps.Submissions}
 			mux.HandleFunc("POST /api/v1/matches/{id}/submissions", submissionRoutes.create)
 			mux.HandleFunc("GET /api/v1/submissions/{id}", submissionRoutes.get)
+		}
+		if deps.Practice != nil {
+			practiceRoutes := practiceHandlers{
+				accounts:    handlers,
+				practice:    deps.Practice,
+				submissions: deps.Submissions,
+			}
+			mux.HandleFunc("GET /api/v1/practice/problems", practiceRoutes.problems)
+			mux.HandleFunc("POST /api/v1/practice/sessions", practiceRoutes.startSession)
+			mux.HandleFunc("GET /api/v1/practice/sessions/{id}", practiceRoutes.session)
+			mux.HandleFunc("PUT /api/v1/practice/sessions/{id}/code", practiceRoutes.updateCode)
+			mux.HandleFunc("POST /api/v1/practice/sessions/{id}/submissions", practiceRoutes.createSubmission)
 		}
 	}
 

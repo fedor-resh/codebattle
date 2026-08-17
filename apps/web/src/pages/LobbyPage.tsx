@@ -16,7 +16,7 @@ import {
 import { useDebouncedValue } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { IconAlertCircle, IconSearch, IconSwords } from '@tabler/icons-react';
+import { IconAlertCircle, IconSearch, IconSwords, IconTarget } from '@tabler/icons-react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -140,6 +140,14 @@ export function LobbyPage({ currentUser }: { currentUser: User }) {
             <Text size="xs" c="dimmed">
               Выбранный класс действует во всех раундах серии.
             </Text>
+            <Button
+              mt="sm"
+              variant="light"
+              leftSection={<IconTarget size={18} />}
+              onClick={() => navigate('/practice')}
+            >
+              Решать задачи одному
+            </Button>
           </Stack>
         </Paper>
 

@@ -11,7 +11,7 @@ import {
   Title,
 } from '@mantine/core';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { IconLogout, IconSwords } from '@tabler/icons-react';
+import { IconLogout, IconSwords, IconTarget } from '@tabler/icons-react';
 import { lazy, Suspense } from 'react';
 import { Link, Navigate, Route, Routes } from 'react-router-dom';
 
@@ -19,9 +19,13 @@ import { getMe, logout, type User } from '../api/client';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { AuthPage } from '../pages/AuthPage';
 import { LobbyPage } from '../pages/LobbyPage';
+import { PracticePage } from '../pages/PracticePage';
 
 const MatchShellPage = lazy(() =>
   import('../pages/MatchShellPage').then((module) => ({ default: module.MatchShellPage })),
+);
+const PracticeSolvePage = lazy(() =>
+  import('../pages/PracticeSolvePage').then((module) => ({ default: module.PracticeSolvePage })),
 );
 
 export function App() {
@@ -58,6 +62,25 @@ export function App() {
             <Group gap="xs" wrap="nowrap">
               {currentUser && (
                 <>
+                  <Button
+                    variant="subtle"
+                    color="gray"
+                    size="compact-sm"
+                    component={Link}
+                    to="/"
+                  >
+                    Дуэли
+                  </Button>
+                  <Button
+                    variant="subtle"
+                    color="gray"
+                    size="compact-sm"
+                    leftSection={<IconTarget size={16} />}
+                    component={Link}
+                    to="/practice"
+                  >
+                    Тренировка
+                  </Button>
                   <Text size="sm" fw={600} visibleFrom="sm">
                     {currentUser.username}
                   </Text>
@@ -99,6 +122,21 @@ export function App() {
         {currentUser && (
           <Routes>
             <Route path="/" element={<LobbyPage currentUser={currentUser} />} />
+            <Route path="/practice" element={<PracticePage currentUser={currentUser} />} />
+            <Route
+              path="/practice/:sessionId"
+              element={
+                <Suspense
+                  fallback={
+                    <Center mih="60vh">
+                      <Loader aria-label="Загрузка редактора" />
+                    </Center>
+                  }
+                >
+                  <PracticeSolvePage currentUser={currentUser} />
+                </Suspense>
+              }
+            />
             <Route
               path="/matches/:matchId"
               element={
