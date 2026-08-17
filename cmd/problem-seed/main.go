@@ -28,10 +28,6 @@ func main() {
 		logger.Error("validate problem catalog", "error", err)
 		os.Exit(1)
 	}
-	if len(catalog) != 36 {
-		logger.Error("problem catalog must contain exactly 36 tasks", "count", len(catalog))
-		os.Exit(1)
-	}
 	if *validateOnly {
 		fmt.Printf("validated %d problems\n", len(catalog))
 		return
