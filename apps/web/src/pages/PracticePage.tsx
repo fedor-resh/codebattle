@@ -36,6 +36,7 @@ export function PracticePage({ currentUser }: { currentUser: User }) {
   const [query, setQuery] = useState('');
   const [problemClass, setProblemClass] = useState<ProblemClass | 'all'>('all');
   const [difficulty, setDifficulty] = useState<'all' | PracticeProblem['difficulty']>('all');
+  const [solvedFilter, setSolvedFilter] = useState<'all' | 'unsolved' | 'solved'>('all');
 
   const problemsQuery = useQuery({
     queryKey: ['practice-problems', currentUser.id],
@@ -59,12 +60,17 @@ export function PracticePage({ currentUser }: { currentUser: User }) {
     return items.filter((problem) => {
       if (problemClass !== 'all' && problem.problem_class !== problemClass) return false;
       if (difficulty !== 'all' && problem.difficulty !== difficulty) return false;
+      if (solvedFilter === 'solved' && !problem.solved) return false;
+      if (solvedFilter === 'unsolved' && problem.solved) return false;
       if (!needle) return true;
       return (
         problem.title.toLowerCase().includes(needle) || problem.slug.toLowerCase().includes(needle)
       );
     });
-  }, [difficulty, problemClass, problemsQuery.data, query]);
+  }, [difficulty, problemClass, problemsQuery.data, query, solvedFilter]);
+
+  const solvedCount = (problemsQuery.data ?? []).filter((problem) => problem.solved).length;
+  const totalCount = problemsQuery.data?.length ?? 0;
 
   return (
     <Container size="lg">
@@ -77,6 +83,11 @@ export function PracticePage({ currentUser }: { currentUser: User }) {
           <Text c="dimmed" mt="sm" maw={680}>
             Решайте задачи без соперника. Черновик и отметка «решено» сохраняются на сервере.
           </Text>
+          {problemsQuery.isSuccess && (
+            <Text mt="md" fw={600}>
+              Решено {solvedCount} из {totalCount}
+            </Text>
+          )}
         </Paper>
 
         <Stack gap="sm">
@@ -98,6 +109,16 @@ export function PracticePage({ currentUser }: { currentUser: User }) {
                 { label: difficultyLabel.hard, value: 'hard' },
               ]}
               aria-label="Фильтр по сложности"
+            />
+            <SegmentedControl
+              value={solvedFilter}
+              onChange={(value) => setSolvedFilter(value as typeof solvedFilter)}
+              data={[
+                { label: 'Все', value: 'all' },
+                { label: 'Нерешённые', value: 'unsolved' },
+                { label: 'Решённые', value: 'solved' },
+              ]}
+              aria-label="Фильтр по статусу решения"
             />
             <TextInput
               value={query}

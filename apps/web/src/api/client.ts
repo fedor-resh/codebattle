@@ -75,6 +75,7 @@ export type Problem = {
   public_tests: Array<{ arguments?: unknown[]; input?: string; expected: unknown }>;
   time_limit_ms: number;
   memory_limit_mb: number;
+  solved_by_you?: boolean;
 };
 
 export type SubmissionStatus =
@@ -307,6 +308,7 @@ export type PracticeProblem = {
   problem_class: ProblemClass;
   requirements: Problem['requirements'];
   solved: boolean;
+  solved_at?: string;
 };
 
 export type PracticeSession = {

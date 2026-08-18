@@ -215,8 +215,12 @@ func (r *PostgresRepository) AcceptInvitation(
 		) latest
 		WHERE problem_class = $1
 		  AND ($2::text IS NULL OR difficulty = $2)
-		ORDER BY random() LIMIT 1
-	`, problemClass, nullableText(difficulty)).Scan(&problemVersionID); errors.Is(err, pgx.ErrNoRows) {
+		ORDER BY EXISTS (
+			SELECT 1 FROM solved_problems sp
+			WHERE sp.problem_slug = latest.slug AND sp.user_id IN ($3, $4)
+		) ASC, random()
+		LIMIT 1
+	`, problemClass, nullableText(difficulty), senderID, receiverID).Scan(&problemVersionID); errors.Is(err, pgx.ErrNoRows) {
 		return Match{}, ErrProblemsMissing
 	} else if err != nil {
 		return Match{}, err
@@ -264,8 +268,8 @@ func (r *PostgresRepository) DeclineInvitation(
 
 func (r *PostgresRepository) Match(ctx context.Context, matchID, userID string) (Match, error) {
 	return scanMatch(r.pool.QueryRow(ctx, matchQuery+`
-		WHERE m.id = $1 AND (m.player_one_id = $2 OR m.player_two_id = $2)
-	`, matchID, userID))
+		WHERE m.id = $2 AND (m.player_one_id = $1 OR m.player_two_id = $1)
+	`, userID, matchID))
 }
 
 func (r *PostgresRepository) LeaveMatch(ctx context.Context, matchID, userID string, now time.Time) error {
@@ -373,7 +377,7 @@ func (r *PostgresRepository) Ready(ctx context.Context, matchID, userID string, 
 			UPDATE matches SET player_one_ready = $2, player_two_ready = $3 WHERE id = $1
 		`, matchID, playerOneReady, playerTwoReady)
 	} else {
-		err = startNextRound(ctx, tx, matchID, problemClass, difficulty, currentProblemID, history)
+		err = startNextRound(ctx, tx, matchID, problemClass, difficulty, currentProblemID, history, playerOneID, playerTwoID)
 	}
 	if err != nil {
 		return Match{}, err
@@ -423,7 +427,7 @@ func (r *PostgresRepository) Skip(ctx context.Context, matchID, userID string, n
 	}
 
 	if playerOneSkip && playerTwoSkip {
-		err = startNextRound(ctx, tx, matchID, problemClass, difficulty, currentProblemID, history)
+		err = startNextRound(ctx, tx, matchID, problemClass, difficulty, currentProblemID, history, playerOneID, playerTwoID)
 	} else {
 		_, err = tx.Exec(ctx, `
 			UPDATE matches SET player_one_skip = $2, player_two_skip = $3 WHERE id = $1
@@ -447,6 +451,8 @@ func startNextRound(
 	difficulty string,
 	currentProblemID string,
 	history []byte,
+	playerOneID string,
+	playerTwoID string,
 ) error {
 	var nextProblemID string
 	err := tx.QueryRow(ctx, `
@@ -462,8 +468,12 @@ func startNextRound(
 		WHERE problem_class = $2
 		  AND ($3::text IS NULL OR difficulty = $3)
 		  AND slug NOT IN (SELECT slug FROM seen_slugs)
-		ORDER BY random() LIMIT 1
-	`, history, problemClass, nullableText(difficulty)).Scan(&nextProblemID)
+		ORDER BY EXISTS (
+			SELECT 1 FROM solved_problems sp
+			WHERE sp.problem_slug = latest.slug AND sp.user_id IN ($4, $5)
+		) ASC, random()
+		LIMIT 1
+	`, history, problemClass, nullableText(difficulty), playerOneID, playerTwoID).Scan(&nextProblemID)
 	resetHistory := false
 	if errors.Is(err, pgx.ErrNoRows) {
 		resetHistory = true
@@ -476,8 +486,12 @@ func startNextRound(
 			WHERE problem_class = $2
 			  AND ($3::text IS NULL OR difficulty = $3)
 			  AND slug <> (SELECT slug FROM problem_versions WHERE id = $1)
-			ORDER BY random() LIMIT 1
-		`, currentProblemID, problemClass, nullableText(difficulty)).Scan(&nextProblemID)
+			ORDER BY EXISTS (
+				SELECT 1 FROM solved_problems sp
+				WHERE sp.problem_slug = latest.slug AND sp.user_id IN ($4, $5)
+			) ASC, random()
+			LIMIT 1
+		`, currentProblemID, problemClass, nullableText(difficulty), playerOneID, playerTwoID).Scan(&nextProblemID)
 	}
 	if err != nil {
 		return ErrProblemsMissing
@@ -551,6 +565,10 @@ const matchQuery = `
 		COALESCE(problem.function_signature, ''), COALESCE(problem.starter_code, ''),
 		COALESCE(problem.public_tests, '[]'::jsonb)::text,
 		COALESCE(problem.time_limit_ms, 0), COALESCE(problem.memory_limit_mb, 0),
+		EXISTS (
+			SELECT 1 FROM solved_problems sp
+			WHERE sp.user_id = $1 AND sp.problem_slug = problem.slug
+		),
 		m.round_number, COALESCE(m.round_winner_id, ''),
 		m.player_one_ready, m.player_two_ready,
 		m.player_one_skip, m.player_two_skip, COALESCE(m.winning_source_code, ''),
@@ -590,7 +608,7 @@ func scanMatch(row rowScanner) (Match, error) {
 		&problem.ID, &problem.Slug, &problem.Title, &problem.Difficulty,
 		&problem.ProblemClass, &requirements,
 		&problem.Statement, &problem.FunctionSignature, &problem.StarterCode,
-		&publicTests, &problem.TimeLimitMS, &problem.MemoryLimitMB,
+		&publicTests, &problem.TimeLimitMS, &problem.MemoryLimitMB, &problem.SolvedByYou,
 		&match.RoundNumber, &match.RoundWinnerID,
 		&match.PlayerOneReady, &match.PlayerTwoReady,
 		&match.PlayerOneSkip, &match.PlayerTwoSkip, &match.WinningSource,

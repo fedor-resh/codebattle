@@ -88,6 +88,7 @@ type Problem struct {
 	PublicTests       json.RawMessage       `json:"public_tests"`
 	TimeLimitMS       int                   `json:"time_limit_ms"`
 	MemoryLimitMB     int                   `json:"memory_limit_mb"`
+	SolvedByYou       bool                  `json:"solved_by_you"`
 }
 
 type State struct {

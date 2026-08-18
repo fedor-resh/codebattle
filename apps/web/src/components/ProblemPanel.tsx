@@ -28,6 +28,11 @@ export function ProblemPanel({ problem }: { problem: Problem }) {
               <Badge color={difficultyColor[problem.difficulty]} variant="light">
                 {difficultyLabel[problem.difficulty]}
               </Badge>
+              {problem.solved_by_you && (
+                <Badge color="gray" variant="light">
+                  Вы уже решали
+                </Badge>
+              )}
               <Text size="xs" c="dimmed">
                 {problem.time_limit_ms} мс · {problem.memory_limit_mb} МБ
               </Text>

@@ -22,14 +22,15 @@ func (r *PostgresRepository) Problems(ctx context.Context, userID string) ([]Pro
 	rows, err := r.pool.Query(ctx, `
 		SELECT latest.slug, latest.title, latest.difficulty, latest.problem_class,
 			COALESCE(latest.requirements, '{}'::jsonb)::text,
-			session.solved_at IS NOT NULL
+			solved.last_solved_at IS NOT NULL,
+			solved.last_solved_at
 		FROM (
 			SELECT DISTINCT ON (slug) slug, title, difficulty, problem_class, requirements, id
 			FROM problem_versions
 			ORDER BY slug, version DESC
 		) latest
-		LEFT JOIN practice_sessions session
-			ON session.user_id = $1 AND session.problem_version_id = latest.id
+		LEFT JOIN solved_problems solved
+			ON solved.user_id = $1 AND solved.problem_slug = latest.slug
 		ORDER BY latest.title
 	`, userID)
 	if err != nil {
@@ -43,7 +44,7 @@ func (r *PostgresRepository) Problems(ctx context.Context, userID string) ([]Pro
 		var requirements string
 		if err := rows.Scan(
 			&item.Slug, &item.Title, &item.Difficulty, &item.ProblemClass,
-			&requirements, &item.Solved,
+			&requirements, &item.Solved, &item.SolvedAt,
 		); err != nil {
 			return nil, err
 		}

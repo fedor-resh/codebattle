@@ -25,6 +25,7 @@ type ProblemSummary struct {
 	ProblemClass problems.Class        `json:"problem_class"`
 	Requirements problems.Requirements `json:"requirements"`
 	Solved       bool                  `json:"solved"`
+	SolvedAt     *time.Time            `json:"solved_at,omitempty"`
 }
 
 type Problem struct {

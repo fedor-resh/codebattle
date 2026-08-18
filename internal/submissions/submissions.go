@@ -304,27 +304,37 @@ func (r *Repository) Finish(ctx context.Context, job Job, status string, result 
 	`, job.ID, status, encoded); err != nil {
 		return err
 	}
-	if status == "accepted" && job.PracticeSessionID != "" {
-		if _, err := tx.Exec(ctx, `
-			UPDATE practice_sessions SET solved_at = COALESCE(solved_at, now()), updated_at = now()
-			WHERE id = $1
-		`, job.PracticeSessionID); err != nil {
-			return err
+	if status == "accepted" {
+		if job.PracticeSessionID != "" {
+			if _, err := tx.Exec(ctx, `
+				UPDATE practice_sessions SET solved_at = COALESCE(solved_at, now()), updated_at = now()
+				WHERE id = $1
+			`, job.PracticeSessionID); err != nil {
+				return err
+			}
+		} else {
+			if _, err := tx.Exec(ctx, `
+				UPDATE matches SET
+					state = CASE WHEN state = 'paused' THEN 'paused' ELSE 'waiting_ready' END,
+					paused_from_state = CASE WHEN state = 'paused' THEN 'waiting_ready' ELSE paused_from_state END,
+					round_winner_id = $2,
+					winning_source_code = $4,
+					player_one_skip = false, player_two_skip = false,
+					player_one_score = player_one_score + CASE WHEN player_one_id = $2 THEN 1 ELSE 0 END,
+					player_two_score = player_two_score + CASE WHEN player_two_id = $2 THEN 1 ELSE 0 END
+				WHERE id = $1
+					AND (state = 'active' OR (state = 'paused' AND paused_from_state = 'active'))
+					AND problem_version_id = $3
+			`, job.MatchID, job.UserID, job.ProblemVersionID, job.SourceCode); err != nil {
+				return err
+			}
 		}
-	} else if status == "accepted" {
 		if _, err := tx.Exec(ctx, `
-			UPDATE matches SET
-				state = CASE WHEN state = 'paused' THEN 'paused' ELSE 'waiting_ready' END,
-				paused_from_state = CASE WHEN state = 'paused' THEN 'waiting_ready' ELSE paused_from_state END,
-				round_winner_id = $2,
-				winning_source_code = $4,
-				player_one_skip = false, player_two_skip = false,
-				player_one_score = player_one_score + CASE WHEN player_one_id = $2 THEN 1 ELSE 0 END,
-				player_two_score = player_two_score + CASE WHEN player_two_id = $2 THEN 1 ELSE 0 END
-			WHERE id = $1
-				AND (state = 'active' OR (state = 'paused' AND paused_from_state = 'active'))
-				AND problem_version_id = $3
-		`, job.MatchID, job.UserID, job.ProblemVersionID, job.SourceCode); err != nil {
+			INSERT INTO solved_problems (user_id, problem_slug)
+			SELECT $1, slug FROM problem_versions WHERE id = $2
+			ON CONFLICT (user_id, problem_slug) DO UPDATE
+			SET last_solved_at = now(), solved_count = solved_problems.solved_count + 1
+		`, job.UserID, job.ProblemVersionID); err != nil {
 			return err
 		}
 	}
